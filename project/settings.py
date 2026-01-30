@@ -38,12 +38,11 @@ print(f"HOST: {HOST}")
 INSTALLED_APPS = [
     # Local apps
     "blog",
-    "core",
     # Installed apps
     "unfold",  # before django.contrib.admin
     # "unfold.contrib.filters",  # optional, if special filters are needed
-    # "unfold.contrib.forms",  # optional, if special form elements are needed
-    # "unfold.contrib.inlines",  # optional, if special inlines are needed
+    "unfold.contrib.forms",  # optional, if special form elements are needed
+    "unfold.contrib.inlines",  # optional, if special inlines are needed
     # "unfold.contrib.import_export",  # optional, if django-import-export package is used
     # "unfold.contrib.guardian",  # optional, if django-guardian package is used
     # "unfold.contrib.simple_history",  # optional, if django-simple-history package is used
@@ -226,6 +225,10 @@ else:
     STATIC_URL = "/static/"
     MEDIA_URL = "/media/"
 
+    STATICFILES_DIRS = [
+        BASE_DIR / "static",
+    ]
+
     # NEW: Default local storages
     STORAGES = {
         "default": {
@@ -268,8 +271,8 @@ EMAILS_LEADS_NOTIFICATIONS = os.getenv("EMAILS_LEADS_NOTIFICATIONS").split(",")
 
 # Unfold setup
 UNFOLD = {
-    "SITE_TITLE": "Cancun Airport Transportation",
-    "SITE_HEADER": "Cancun Airport Transportation",
+    "SITE_TITLE": "Cancun Airport Transportation (Admin)",
+    "SITE_HEADER": "CAT (Admin)",
     "SITE_SUBHEADER": "Dashboard",
     "SITE_DROPDOWN": [
         {
@@ -319,10 +322,10 @@ UNFOLD = {
         # "form": "app.forms.CustomLoginForm",
     },
     "STYLES": [
-        lambda request: static("core/css/style.css"),
+        lambda request: static("css/style.css"),
     ],
     "SCRIPTS": [
-        lambda request: static("core/js/script.js"),
+        lambda request: static("js/script.js"),
     ],
     # "BORDER_RADIUS": "6px",
     "COLORS": {
