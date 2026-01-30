@@ -18,6 +18,7 @@ from unfold.admin import ModelAdmin
 from unfold.contrib.forms.widgets import ArrayWidget, WysiwygWidget
 from unfold.decorators import action
 from unfold.paginator import InfinitePaginator
+from unfold.contrib.filters.admin import RangeDateFilter
 
 
 admin.site.unregister(User)
@@ -37,6 +38,7 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
     pass
 
 
+# Base class for all admin models
 class ModelAdminUnfoldBase(ModelAdmin):
     # UI setup
     compressed_fields = True
@@ -78,3 +80,25 @@ class ModelAdminUnfoldBase(ModelAdmin):
 
     # Pagination
     paginator = InfinitePaginator
+
+    # Filters
+    global_filters = (
+        ("created_at", RangeDateFilter),
+        ("updated_at", RangeDateFilter),
+    )
+
+    def get_list_filter(self, request):
+        # Get filters defined in the child class
+        child_filters = super().get_list_filter(request) or []
+
+        # Create a list to hold our final filters
+        final_filters = list(child_filters)
+
+        # Only add global filters if the model actually has those fields
+        model_fields = [f.name for f in self.model._meta.get_fields()]
+
+        for field_name, filter_class in self.global_filters:
+            if field_name in model_fields and field_name not in str(final_filters):
+                final_filters.append((field_name, filter_class))
+
+        return final_filters

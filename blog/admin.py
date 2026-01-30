@@ -18,11 +18,8 @@ from project.admin import ModelAdminUnfoldBase
 @admin.register(blog_models.Post)
 class PostAdmin(ModelAdminUnfoldBase):
     # Django basic setup
-    list_display = ("title", "slug", "author", "created_at", "updated_at")
-    list_filter = ("created_at", "updated_at")
-    search_fields = ("title", "content")
-    # prepopulated_fields = {'slug': ('title',)}
-    # raw_id_fields = ('author',)
-    # date_hierarchy = 'publish'
-    # ordering = ('status', 'publish')
-    list_display_links = ("title", "slug")
+    list_display = ("title", "lang", "created_at")
+    search_fields = ("title", "description", "content")
+    list_filter = ("lang",)
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
