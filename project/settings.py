@@ -32,9 +32,7 @@ print(f"HOST: {HOST}")
 
 INSTALLED_APPS = [
     # Local apps
-    "core",
     "blog",
-    "leads",
     # Installed apps
     "unfold",  # before django.contrib.admin
     # "unfold.contrib.filters",  # optional, if special filters are needed
@@ -236,7 +234,7 @@ else:
 # Setup drf
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-    "DEFAULT_PAGINATION_CLASS": "core.pagination.CustomPageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "project.pagination.CustomPageNumberPagination",
     "PAGE_SIZE": 12,
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework.authentication.TokenAuthentication",
