@@ -4,6 +4,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from django.templatetags.static import static
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
+
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -259,3 +264,160 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL") == "True"
 EMAIL_FROM = EMAIL_HOST_USER
 EMAILS_LEADS_NOTIFICATIONS = os.getenv("EMAILS_LEADS_NOTIFICATIONS").split(",")
+
+
+# Unfold setup
+UNFOLD = {
+    "SITE_TITLE": "Cancun Airport Transportation",
+    "SITE_HEADER": "Cancun Airport Transportation",
+    "SITE_SUBHEADER": "Dashboard",
+    "SITE_DROPDOWN": [
+        {
+            "icon": "web",
+            "title": "Landing Page",
+            "link": "https://cancunsairporttransportation.com/",
+        },
+    ],
+    "SITE_URL": "/",
+    "SITE_ICON": lambda request: static(
+        "favicon.png"
+    ),  # both modes, optimise for 32px height
+    # "SITE_ICON": {
+    #     "light": lambda request: static("icon-light.svg"),  # light mode
+    #     "dark": lambda request: static("icon-dark.svg"),  # dark mode
+    # },
+    "SITE_LOGO": lambda request: static(
+        "logo.svg"
+    ),  # both modes, optimise for 32px height
+    # "SITE_LOGO": {
+    #     "light": lambda request: static("logo-light.svg"),  # light mode
+    #     "dark": lambda request: static("logo-dark.svg"),  # dark mode
+    # },
+    "SITE_SYMBOL": "blog",  # symbol from icon set
+    "SITE_FAVICONS": [
+        {
+            "rel": "icon",
+            "sizes": "32x32",
+            "type": "image/svg+xml",
+            "href": lambda request: static("favicon.png"),
+            "attrs": {
+                "target": "_blank",
+            },
+        },
+    ],
+    "SHOW_HISTORY": True,  # show/hide "History" button, default: True
+    "SHOW_VIEW_ON_SITE": True,  # show/hide "View on site" button, default: True
+    "SHOW_BACK_BUTTON": False,  # show/hide "Back" button on changeform in header, default: False
+    "ENVIRONMENT": "utils.callbacks.environment_callback",  # environment name in header
+    "ENVIRONMENT_TITLE_PREFIX": "utils.callbacks.environment_title_prefix_callback",  # environment name prefix in title tag
+    "DASHBOARD_CALLBACK": "utils.callbacks.dashboard_callback",
+    "THEME": "light",  # Force theme: "dark" or "light". Will disable theme switcher
+    "LOGIN": {
+        # "image": lambda request: static("logo.svg"),
+        "redirect_after": lambda request: reverse_lazy("admin:APP_MODEL_changelist"),
+        # Inherits from `unfold.forms.AuthenticationForm`
+        # "form": "app.forms.CustomLoginForm",
+    },
+    "STYLES": [
+        lambda request: static("core/css/style.css"),
+    ],
+    "SCRIPTS": [
+        lambda request: static("core/js/script.js"),
+    ],
+    # "BORDER_RADIUS": "6px",
+    "COLORS": {
+        # Base colors: Neutral gray scale from #757575 (gray) to #16161d (near black)
+        "base": {
+            "50": "oklch(98% .003 247)",
+            "100": "oklch(96% .003 247)",
+            "200": "oklch(91% .005 247)",
+            "300": "oklch(84% .008 247)",
+            "400": "oklch(68% .012 247)",
+            "500": "oklch(54% .014 247)",  # ~#757575 (Medium Gray)
+            "600": "oklch(44% .014 247)",
+            "700": "oklch(36% .015 247)",
+            "800": "oklch(28% .016 264)",
+            "900": "oklch(22% .018 264)",
+            "950": "oklch(16% .02 264)",  # ~#16161d (Near Black)
+        },
+        # Primary colors: Orange accent scale from #ff8400
+        "primary": {
+            "50": "oklch(97% .025 70)",
+            "100": "oklch(94% .055 70)",
+            "200": "oklch(89% .095 65)",
+            "300": "oklch(82% .145 60)",
+            "400": "oklch(75% .18 55)",
+            "500": "oklch(70% .19 50)",  # ~#ff8400 (Orange Accent)
+            "600": "oklch(62% .175 48)",
+            "700": "oklch(53% .155 46)",
+            "800": "oklch(45% .13 45)",
+            "900": "oklch(38% .1 44)",
+            "950": "oklch(28% .07 42)",
+        },
+        "font": {
+            "subtle-light": "var(--color-base-500)",  # text-base-500
+            "subtle-dark": "var(--color-base-400)",  # text-base-400
+            "default-light": "var(--color-base-600)",  # text-base-600
+            "default-dark": "var(--color-base-300)",  # text-base-300
+            "important-light": "var(--color-base-900)",  # text-base-900
+            "important-dark": "var(--color-base-100)",  # text-base-100
+        },
+    },
+    # "EXTENSIONS": {
+    #     "modeltranslation": {
+    #         "flags": {
+    #             "en": "🇬🇧",
+    #             "fr": "🇫🇷",
+    #             "nl": "🇧🇪",
+    #         },
+    #     },
+    # },
+    # "SIDEBAR": {
+    #     "show_search": True,  # Search in applications and models names
+    #     "command_search": False,  # Replace the sidebar search with the command search
+    #     "show_all_applications": True,  # Dropdown with all applications and models
+    #     "navigation": [
+    #         {
+    #             "title": "Apps",
+    #             "separator": True,  # Top border
+    #             "collapsible": True,  # Collapsible group of links
+    #             "items": [
+    #                 {
+    #                     "title": _("Dashboard"),
+    #                     "icon": "dashboard",  # Supported icon set: https://fonts.google.com/icons
+    #                     "link": reverse_lazy("admin:index"),
+    #                     "badge": "sample_app.badge_callback",
+    #                     "badge_variant": "info",  # info, success, warning, primary, danger
+    #                     "badge_style": "solid",  # background fill style
+    #                     "permission": lambda request: request.user.is_superuser,
+    #                 },
+    #                 {
+    #                     "title": _("Users"),
+    #                     "icon": "people",
+    #                     "link": reverse_lazy("admin:auth_user_changelist"),
+    #                 },
+    #             ],
+    #         },
+    #     ],
+    # },
+    "TABS": [
+        {
+            # These models will display the tab navigation
+            "models": [
+                "auth.user",
+                "auth.group",
+            ],
+            # Tab items that appear when viewing any of the above models
+            "items": [
+                {
+                    "title": _("Users"),
+                    "link": reverse_lazy("admin:auth_user_changelist"),
+                },
+                {
+                    "title": _("Groups"),
+                    "link": reverse_lazy("admin:auth_group_changelist"),
+                },
+            ],
+        },
+    ],
+}
