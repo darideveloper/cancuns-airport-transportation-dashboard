@@ -1,0 +1,24 @@
+# base
+Django>=5.2,<5.3
+whitenoise>=6.11.0
+gunicorn>=24.1.1
+django-cors-headers>=4.9.0
+python-dotenv>=1.0.1
+
+# posgresql
+psycopg>=3.2.3
+
+# images and s3
+pillow>=11.1.0  
+django-storages>=1.14.2
+boto3>=1.36.0
+
+# drf & jwt
+djangorestframework>=3.16.1
+django-filter>=24.3
+
+# testing
+selenium>=4.40.0
+
+# admin
+django-unfold==0.77.1
