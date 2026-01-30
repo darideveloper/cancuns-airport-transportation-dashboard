@@ -3,19 +3,26 @@ from django.utils.text import slugify
 
 
 class Post(models.Model):
-    LANGS = (
-        ("es", "Español"),
-        ("en", "Inglés"),
-    )
+    # Django 5 allows using a dictionary for choices directly
+    LANGS = {
+        "es": "Español",
+        "en": "Inglés",
+    }
 
     id = models.AutoField(primary_key=True)
     title = models.CharField(max_length=255, verbose_name="Título")
+
     slug = models.SlugField(
         max_length=255, verbose_name="Slug", unique=True, blank=True, null=True
     )
+
     lang = models.CharField(
-        max_length=2, choices=LANGS, default="es", verbose_name="Idioma"
+        max_length=2,
+        choices=LANGS,  # Passing the dictionary directly
+        default="es",
+        verbose_name="Idioma",
     )
+
     banner_image_url = models.CharField(
         max_length=255,
         verbose_name="Banner URL",
@@ -23,17 +30,20 @@ class Post(models.Model):
         blank=True,
         null=True,
     )
-    description = models.TextField(
-        verbose_name="Descripción corta",
-    )
+
+    description = models.TextField(verbose_name="Descripción corta")
+
     keywords = models.CharField(
         max_length=255,
         verbose_name="Palabras clave",
         help_text="Separadas por comas",
     )
+
+    # UPDATED: Use db_default for database-level integrity
     author = models.CharField(
-        max_length=255, verbose_name="Autor", default="Ella Skin & Spa Wellness Team"
+        max_length=255, verbose_name="Autor", db_default="Ella Skin & Spa Wellness Team"
     )
+
     related_post = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
@@ -41,10 +51,13 @@ class Post(models.Model):
         blank=True,
         verbose_name="Entrada relacionada",
     )
+
     content = models.TextField(verbose_name="Contenido")
+
     created_at = models.DateTimeField(
         auto_now_add=True, verbose_name="Fecha de creación"
     )
+
     updated_at = models.DateTimeField(
         auto_now=True, verbose_name="Fecha de actualización"
     )
@@ -57,13 +70,13 @@ class Post(models.Model):
         return self.title
 
     def save(self, *args, **kwargs):
-
         # Override slug if not set
         if not self.slug:
             self.slug = slugify(self.title)
         super().save(*args, **kwargs)
 
 
+# The Image model remains unchanged as it is already standard.
 class Image(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255, verbose_name="Nombre")
