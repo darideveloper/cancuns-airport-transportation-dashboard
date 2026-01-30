@@ -188,32 +188,49 @@ if STORAGE_AWS:
     AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
 
-    # s3 static settings
+    # NEW: Django 5 STORAGES configuration
+    STORAGES = {
+        "default": {
+            "BACKEND": "project.storage_backends.PublicMediaStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "project.storage_backends.StaticStorage",
+        },
+        # Optional: Keep your private storage accessible via a custom key if needed
+        "private": {
+            "BACKEND": "project.storage_backends.PrivateMediaStorage",
+        },
+    }
+
+    # These URLs are still needed for reference, but not for the backend config
     STATIC_LOCATION = "static"
     STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/"
-    STATICFILES_STORAGE = "project.storage_backends.StaticStorage"
-    # s3 public media settings
 
     PUBLIC_MEDIA_LOCATION = "media"
     MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
-    DEFAULT_FILE_STORAGE = "project.storage_backends.PublicMediaStorage"
 
-    # s3 private media settings
     PRIVATE_MEDIA_LOCATION = "private"
-    PRIVATE_FILE_STORAGE = "project.storage_backends.PrivateMediaStorage"
 
-    # Disable Django's own staticfiles handling in favour of WhiteNoise
-    # for greater consistency between gunicorn and
     STATIC_ROOT = None
     MEDIA_ROOT = None
+
 else:
-    # Local development (Windows or local server)
+    # Local development
     STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
     MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-    # Static files (CSS, JavaScript, Images)
     STATIC_URL = "/static/"
     MEDIA_URL = "/media/"
+
+    # NEW: Default local storages
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 
 # Setup drf
@@ -232,7 +249,6 @@ REST_FRAMEWORK = {
 DATE_FORMAT = "d/b/Y"
 TIME_FORMAT = "H:i"
 DATETIME_FORMAT = f"{DATE_FORMAT} {TIME_FORMAT}"
-USE_L10N = False
 
 # Setup emails
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
