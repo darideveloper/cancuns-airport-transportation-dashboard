@@ -33,6 +33,7 @@ print(f"HOST: {HOST}")
 INSTALLED_APPS = [
     # Local apps
     "blog",
+    "core",
     # Installed apps
     "unfold",  # before django.contrib.admin
     # "unfold.contrib.filters",  # optional, if special filters are needed
