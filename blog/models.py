@@ -1,6 +1,5 @@
 from django.db import models
 from django.utils.text import slugify
-from django.contrib.postgres.fields import ArrayField
 
 
 class Post(models.Model):
@@ -28,12 +27,9 @@ class Post(models.Model):
         null=True,
     )
     description = models.TextField(verbose_name="Descripción corta")
-    keywords = ArrayField(
-        models.CharField(max_length=255),
+    keywords = models.CharField(
+        max_length=255,
         verbose_name="Palabras clave",
-        default=list,
-        blank=True,
-        null=True,
         help_text="Separadas por comas",
     )
     author = models.CharField(

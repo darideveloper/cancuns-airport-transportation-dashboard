@@ -3,7 +3,6 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import User, Group
 from django.contrib import admin
-from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.http import HttpRequest
 from django.shortcuts import redirect
@@ -11,7 +10,7 @@ from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
 
 from unfold.admin import ModelAdmin
-from unfold.contrib.forms.widgets import ArrayWidget, WysiwygWidget
+from unfold.contrib.forms.widgets import WysiwygWidget
 from unfold.decorators import action
 from unfold.paginator import InfinitePaginator
 from unfold.contrib.filters.admin import RangeDateFilter
@@ -93,14 +92,21 @@ class ModelAdminUnfoldBase(ModelAdmin):
         return self.has_change_permission(request, obj)
 
     # ---------------------------------------------------------------------------
-    # Custom fields
+    # Custom fields / widgets
     # ---------------------------------------------------------------------------
-    formfield_overrides = {
-        models.TextField: {
-            "widget": WysiwygWidget,
-        },
-        ArrayField: {"widget": ArrayWidget},
+    base_formfield_overrides = {
+        models.TextField: {"widget": WysiwygWidget},
     }
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        # Apply base overrides first
+        for klass in db_field.__class__.mro():
+            if klass in self.base_formfield_overrides:
+                kwargs.update(self.base_formfield_overrides[klass])
+                break
+        # Let Django handle the standard 'formfield_overrides' (from child classes)
+        # This will naturally overwrite base settings if the same field class is used.
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
 
     # ---------------------------------------------------------------------------
     # Pagination

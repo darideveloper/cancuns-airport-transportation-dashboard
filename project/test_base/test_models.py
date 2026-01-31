@@ -13,7 +13,6 @@ class TestPostsModelBase(TestCase):
         title: str = "Post test",
         lang: str = "es",
         description: str = "Test description",
-        keywords: str = "test, keywords",
         author: str = "Ella Skin & Spa Wellness Team",
         content: str = "#Test \n**conten**t",
     ) -> blog_models.Post:
@@ -23,7 +22,6 @@ class TestPostsModelBase(TestCase):
             title=title,
             lang=lang,
             description=description,
-            keywords=keywords,
             author=author,
             content=content,
         )
@@ -32,7 +30,7 @@ class TestPostsModelBase(TestCase):
         self,
         post: blog_models.Post = None,
         name: str = "Image test",
-        image_name: str = "test.webp",
+        image_name: str = "test.png",
     ) -> blog_models.Image:
         """Create a image object"""
 

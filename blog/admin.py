@@ -3,9 +3,11 @@ from django.utils.html import format_html
 from django.http import HttpRequest
 from django.contrib import messages
 from django.shortcuts import redirect
+from django.db.models import JSONField
 
 from unfold.decorators import action
 from unfold.admin import display
+from unfold.contrib.forms.widgets import ArrayWidget
 
 from project.admin import ModelAdminUnfoldBase
 from utils.media import get_media_url
@@ -18,6 +20,10 @@ class PostAdmin(ModelAdminUnfoldBase):
     list_display = ("title", "lang", "created_at")
     search_fields = ("title", "description", "content")
     list_filter = ("lang",)
+
+    # formfield_overrides = {
+    #     JSONField: {"widget": ArrayWidget},
+    # }
 
 
 @admin.register(models.Image)
