@@ -2,11 +2,6 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.models import User, Group
-
-from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
-from unfold.admin import ModelAdmin
-
-
 from django.contrib import admin
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
@@ -14,11 +9,14 @@ from django.http import HttpRequest
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+
 from unfold.admin import ModelAdmin
 from unfold.contrib.forms.widgets import ArrayWidget, WysiwygWidget
 from unfold.decorators import action
 from unfold.paginator import InfinitePaginator
 from unfold.contrib.filters.admin import RangeDateFilter
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
+from unfold.admin import ModelAdmin
 
 
 admin.site.unregister(User)
@@ -40,25 +38,41 @@ class GroupAdmin(BaseGroupAdmin, ModelAdmin):
 
 # Base class for all admin models
 class ModelAdminUnfoldBase(ModelAdmin):
+    # ---------------------------------------------------------------------------
+    # Django default setup
+    # ---------------------------------------------------------------------------
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+
+    # ---------------------------------------------------------------------------
     # UI setup
+    # ---------------------------------------------------------------------------
     compressed_fields = True
     warn_unsaved_form = True
     list_filter_sheet = False
     change_form_show_cancel_button = True
 
+    # ---------------------------------------------------------------------------
     # Actions
+    # ---------------------------------------------------------------------------
     actions_row = ["edit"]
 
-    # Custom fields
-    formfield_overrides = {
-        models.TextField: {
-            "widget": WysiwygWidget,
-        },
-        ArrayField: {"widget": ArrayWidget},
-    }
+    def _get_base_actions_row(self):
+        """
+        Overriding Unfold internal logic to merge strings.
+        This ensures Unfold receives a list of strings it can resolve itself.
+        """
+        base_actions = ["edit"]
+        child_actions = getattr(self, "actions_row", [])
+
+        # Merge unique string names
+        all_actions = base_actions + [a for a in child_actions if a not in base_actions]
+
+        # Call the original method logic but with our merged list
+        return [self.get_unfold_action(action) for action in all_actions]
 
     @action(
-        description=_("Edit"),
+        description="Editar",
         permissions=["edit"],
         url_path="edit-post",
     )
@@ -78,10 +92,24 @@ class ModelAdminUnfoldBase(ModelAdmin):
         """
         return self.has_change_permission(request, obj)
 
+    # ---------------------------------------------------------------------------
+    # Custom fields
+    # ---------------------------------------------------------------------------
+    formfield_overrides = {
+        models.TextField: {
+            "widget": WysiwygWidget,
+        },
+        ArrayField: {"widget": ArrayWidget},
+    }
+
+    # ---------------------------------------------------------------------------
     # Pagination
+    # ---------------------------------------------------------------------------
     paginator = InfinitePaginator
 
+    # ---------------------------------------------------------------------------
     # Filters
+    # ---------------------------------------------------------------------------
     global_filters = (
         ("created_at", RangeDateFilter),
         ("updated_at", RangeDateFilter),

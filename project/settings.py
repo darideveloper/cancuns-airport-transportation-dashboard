@@ -327,6 +327,7 @@ UNFOLD = {
     "SCRIPTS": [
         lambda request: static("js/script.js"),
         lambda request: static("js/range_date_filter_es.js"),
+        lambda request: static("js/add_tailwind_styles.js"),
     ],
     # "BORDER_RADIUS": "6px",
     "COLORS": {
