@@ -25,8 +25,8 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 STORAGE_AWS = os.environ.get("STORAGE_AWS") == "True"
 HOST = os.getenv("HOST")
 TEST_HEADLESS = os.getenv("TEST_HEADLESS", "False") == "True"
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS").split(",")
-EMAILS_LEADS_NOTIFICATIONS = os.getenv("EMAILS_LEADS_NOTIFICATIONS").split(",")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+EMAILS_LEADS_NOTIFICATIONS = os.getenv("EMAILS_LEADS_NOTIFICATIONS", "").split(",")
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 
 print(f"DEBUG: {DEBUG}")
@@ -175,10 +175,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Cors
 if os.getenv("CORS_ALLOWED_ORIGINS") != "None":
-    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS").split(",")
+    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
 
 if os.getenv("CSRF_TRUSTED_ORIGINS") != "None":
-    CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS").split(",")
+    CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
 
 
 # Storage settings
@@ -266,7 +266,7 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL") == "True"
 EMAIL_FROM = EMAIL_HOST_USER
-EMAILS_LEADS_NOTIFICATIONS = os.getenv("EMAILS_LEADS_NOTIFICATIONS").split(",")
+EMAILS_LEADS_NOTIFICATIONS = os.getenv("EMAILS_LEADS_NOTIFICATIONS", "").split(",")
 
 
 # Unfold setup
