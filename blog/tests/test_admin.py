@@ -48,7 +48,8 @@ class ImageAdminTestCaseSelenium(TestAdminSeleniumBase, TestPostsModelBase):
         self.endpoint = "/admin/blog/image"
 
         self.selectors = {
-            "copy_btn": ".copy-btn",
+            "actions_btn": "tr td:last-child div span",
+            "copy_btn": "a[href*='/copy_link']",
             "image": f"img[src*='{self.image.image.url}']",
         }
 
@@ -89,7 +90,12 @@ class ImageAdminTestCaseSelenium(TestAdminSeleniumBase, TestPostsModelBase):
         sleep(2)
 
         # Get buttons
-        buttons = self.driver.find_elements(By.CSS_SELECTOR, ".copy-btn")
+        actions_btn = self.driver.find_element(
+            By.CSS_SELECTOR, self.selectors["actions_btn"]
+        )
+        actions_btn.click()
+        sleep(2)
+        buttons = self.driver.find_elements(By.CSS_SELECTOR, self.selectors["copy_btn"])
         self.assertEqual(len(buttons), 2, "Copy button missing")
 
     def test_copy_buttons_action(self):
@@ -100,9 +106,17 @@ class ImageAdminTestCaseSelenium(TestAdminSeleniumBase, TestPostsModelBase):
         sleep(2)
 
         # Click button
-        elems = self.get_selenium_elems(self.selectors)
-        button = elems["copy_btn"]
-        button.click()
+        actions_btn = self.driver.find_element(
+            By.CSS_SELECTOR, self.selectors["actions_btn"]
+        )
+        actions_btn.click()
+        sleep(2)
+        buttons = self.driver.find_elements(By.CSS_SELECTOR, self.selectors["copy_btn"])
+        buttons[0].click()
+        sleep(2)
+
+        # Focus current page
+        self.driver.switch_to.window(self.driver.current_window_handle)
         sleep(2)
 
         # Check if image is copied to clipboard
