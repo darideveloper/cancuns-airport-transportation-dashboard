@@ -4,18 +4,20 @@
 document.addEventListener("DOMContentLoaded", function () {
   const texts = [
     {
-      ids: ["created_at_from", "updated_at_from"],
+      names: ["created_at_from", "updated_at_from"],
       text: "Desde",
     },
     {
-      ids: ["created_at_to", "updated_at_to"],
+      names: ["created_at_to", "updated_at_to"],
       text: "Hasta",
     },
   ]
 
   texts.forEach((text) => {
-    text.ids.forEach((id) => {
-      const elem = document.querySelector(`#${id}`)
+    console.log({ text })
+    text.names.forEach((name) => {
+      const elem = document.querySelector(`[name="${name}"]`)
+      console.log({ elem })
       if (!elem) return
       elem.placeholder = text.text
     })
