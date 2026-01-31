@@ -26,6 +26,8 @@ ARG DB_USER
 ARG DB_PASSWORD
 ARG DB_HOST
 ARG DB_PORT
+ARG CORS_ALLOWED_ORIGINS
+ARG CSRF_TRUSTED_ORIGINS
 
 # Export them as ENVs so the 'RUN' commands below can see them
 ENV SECRET_KEY=${SECRET_KEY} \
@@ -34,7 +36,9 @@ ENV SECRET_KEY=${SECRET_KEY} \
     DB_USER=${DB_USER} \
     DB_PASSWORD=${DB_PASSWORD} \
     DB_HOST=${DB_HOST} \
-    DB_PORT=${DB_PORT}
+    DB_PORT=${DB_PORT} \
+    CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS} \
+    CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
 
 # Install system dependencies (e.g., for PostgreSQL support)
 RUN apt-get update && apt-get install -y \
