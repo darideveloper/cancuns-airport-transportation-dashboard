@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 
 from unfold.decorators import action
+from unfold.admin import display
 
 from project.admin import ModelAdminUnfoldBase
 from utils.media import get_media_url
@@ -21,11 +22,11 @@ class PostAdmin(ModelAdminUnfoldBase):
 
 @admin.register(models.Image)
 class ImageAdmin(ModelAdminUnfoldBase):
-    list_display = ("name", "image")
+    list_display = ("name", "created_at", "display_image")
     search_fields = ("name",)
     ordering = ("name",)
 
-    # This will now be merged with ["edit"] automatically
+    # actions
     actions_row = ["copy_link"]
 
     @action(description="Copiar link")
@@ -42,5 +43,13 @@ class ImageAdmin(ModelAdminUnfoldBase):
 
         return response
 
+    # Custom js
     class Media:
         js = ("js/copy_clipboard.js",)
+
+    # Custom fields
+    @display(description="Preview")
+    def display_image(self, obj):
+        if obj.image:
+            return format_html(f'<img src="{obj.image.url}" class="img-preview" />')
+        return None
