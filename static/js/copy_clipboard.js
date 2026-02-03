@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const url = getCookie('copy_to_clipboard')
   if (url) {
     navigator.clipboard.writeText(url).then(() => {
-      console.log("URL copied automatically!")
       // Clear the cookie
       document.cookie = "copy_to_clipboard=; path=/; Max-Age=-99999999;"
     })

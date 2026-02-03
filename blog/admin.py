@@ -21,9 +21,9 @@ class PostAdmin(ModelAdminUnfoldBase):
     search_fields = ("title", "description", "content")
     list_filter = ("lang",)
 
-    # formfield_overrides = {
-    #     JSONField: {"widget": ArrayWidget},
-    # }
+    # Custom js
+    class Media:
+        js = ("js/load_markdown.js",)
 
 
 @admin.register(models.Image)

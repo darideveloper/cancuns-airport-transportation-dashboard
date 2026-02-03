@@ -14,10 +14,8 @@ document.addEventListener("DOMContentLoaded", function () {
   ]
 
   texts.forEach((text) => {
-    console.log({ text })
     text.names.forEach((name) => {
       const elem = document.querySelector(`[name="${name}"]`)
-      console.log({ elem })
       if (!elem) return
       elem.placeholder = text.text
     })

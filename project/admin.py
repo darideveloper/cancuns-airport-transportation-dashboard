@@ -95,7 +95,7 @@ class ModelAdminUnfoldBase(ModelAdmin):
     # Custom fields / widgets
     # ---------------------------------------------------------------------------
     base_formfield_overrides = {
-        models.TextField: {"widget": WysiwygWidget},
+        # models.TextField: {"widget": WysiwygWidget},
     }
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
