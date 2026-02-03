@@ -22,6 +22,4 @@ urlpatterns = [
     path("api/", include(router.urls)),
 ]
 
-# Only serve media files locally if we are NOT using AWS (Local Dev)
-if not settings.STORAGE_AWS:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

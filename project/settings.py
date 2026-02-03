@@ -22,7 +22,7 @@ print(f"\nEnvironment: {ENV}")
 # Env variables
 SECRET_KEY = os.getenv("SECRET_KEY")
 DEBUG = os.getenv("DEBUG", "False") == "True"
-STORAGE_AWS = os.environ.get("STORAGE_AWS") == "True"
+
 HOST = os.getenv("HOST")
 TEST_HEADLESS = os.getenv("TEST_HEADLESS", "False") == "True"
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
@@ -30,7 +30,7 @@ EMAILS_LEADS_NOTIFICATIONS = os.getenv("EMAILS_LEADS_NOTIFICATIONS", "").split("
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 
 print(f"DEBUG: {DEBUG}")
-print(f"STORAGE_AWS: {STORAGE_AWS}")
+
 print(f"HOST: {HOST}")
 
 # Application definition
@@ -165,7 +165,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
@@ -186,59 +185,20 @@ if os.getenv("CSRF_TRUSTED_ORIGINS") != "None":
 
 
 # Storage settings
-if STORAGE_AWS:
-    # aws settings
-    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
-    AWS_DEFAULT_ACL = None
-    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
-    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+STATIC_URL = "/static/"
+MEDIA_URL = "/media/"
 
-    # NEW: Django 5 STORAGES configuration
-    STORAGES = {
-        "default": {
-            "BACKEND": "project.storage_backends.PublicMediaStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "project.storage_backends.StaticStorage",
-        },
-        # Optional: Keep your private storage accessible via a custom key if needed
-        "private": {
-            "BACKEND": "project.storage_backends.PrivateMediaStorage",
-        },
-    }
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-    # These URLs are still needed for reference, but not for the backend config
-    STATIC_LOCATION = "static"
-    STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/"
-
-    PUBLIC_MEDIA_LOCATION = "media"
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/"
-
-    PRIVATE_MEDIA_LOCATION = "private"
-
-    STATIC_ROOT = None
-    MEDIA_ROOT = None
-
-else:
-    # Local development
-    STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
-
-    STATIC_URL = "/static/"
-    MEDIA_URL = "/media/"
-
-    # NEW: Default local storages
-    STORAGES = {
-        "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
-        },
-        "staticfiles": {
-            # Use WhiteNoise for optimized static serving in production
-            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-        },
-    }
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 
 # Setup drf

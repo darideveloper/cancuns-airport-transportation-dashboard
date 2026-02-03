@@ -8,10 +8,8 @@ python-dotenv>=1.0.1
 # posgresql
 psycopg>=3.2.3
 
-# images and s3
+# images
 pillow>=11.1.0  
-django-storages>=1.14.2
-boto3>=1.36.0
 
 # drf & jwt
 djangorestframework>=3.16.1
