@@ -155,7 +155,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "es-mx"
+LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "America/Mexico_City"
 
@@ -289,7 +289,7 @@ UNFOLD = {
     ],
     "SCRIPTS": [
         lambda request: static("js/script.js"),
-        lambda request: static("js/range_date_filter_es.js"),
+        # lambda request: static("js/range_date_filter_es.js"),
         lambda request: static("js/add_tailwind_styles.js"),
     ],
     # "BORDER_RADIUS": "6px",

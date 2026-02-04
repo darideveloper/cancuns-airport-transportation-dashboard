@@ -50,9 +50,9 @@ class Post(models.Model):
         auto_now=True, verbose_name="Fecha de actualización"
     )
 
-    class Meta:
-        verbose_name_plural = "Entradas"
-        verbose_name = "Entrada"
+    # class Meta:
+    #     verbose_name_plural = "Entradas"
+    #     verbose_name = "Entrada"
 
     def __str__(self):
         return self.title
@@ -76,9 +76,9 @@ class Image(models.Model):
         auto_now=True, verbose_name="Fecha de actualización"
     )
 
-    class Meta:
-        verbose_name_plural = "Imágenes"
-        verbose_name = "Imagen"
+    # class Meta:
+    #     verbose_name_plural = "Imágenes"
+    #     verbose_name = "Imagen"
 
     def __str__(self):
         return self.name
