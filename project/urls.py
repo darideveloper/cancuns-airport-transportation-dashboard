@@ -19,6 +19,7 @@ urlpatterns = [
     # Redirects
     path("", RedirectView.as_view(url="/admin/"), name="home-redirect-admin"),
     # API URLs
+    path("api/", include("legacy_middleware.urls")),
     path("api/", include(router.urls)),
 ]
 

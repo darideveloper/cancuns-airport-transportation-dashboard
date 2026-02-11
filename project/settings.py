@@ -29,6 +29,9 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 EMAILS_LEADS_NOTIFICATIONS = os.getenv("EMAILS_LEADS_NOTIFICATIONS", "").split(",")
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 
+LEGACY_API_BASE_URL = os.getenv("LEGACY_API_BASE_URL")
+LEGACY_API_KEY = os.getenv("LEGACY_API_KEY")
+
 print(f"DEBUG: {DEBUG}")
 
 print(f"HOST: {HOST}")
