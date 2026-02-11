@@ -53,7 +53,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Collect static files and migrate database
 RUN python manage.py collectstatic --noinput
 RUN python manage.py makemigrations
-# RUN python manage.py migrate # no migrate when deploy
+RUN python manage.py migrate
 # RUN python manage.py apps_loaddata
 
 # Expose the port that Django/Gunicorn will run on
