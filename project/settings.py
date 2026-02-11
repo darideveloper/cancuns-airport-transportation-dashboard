@@ -38,6 +38,7 @@ print(f"HOST: {HOST}")
 INSTALLED_APPS = [
     # Local apps
     "blog",
+    "legacy_middleware",
     # Installed apps
     "unfold",  # before django.contrib.admin
     "unfold.contrib.filters",  # optional, if special filters are needed
