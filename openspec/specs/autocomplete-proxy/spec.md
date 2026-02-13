@@ -31,3 +31,12 @@ Given the legacy API returns a `422 Unprocessable Entity` (e.g., keyword too sho
 When a `POST` request is made to `/api/legacy/autocomplete/` with a short keyword
 Then the system returns the same status code and error message from the legacy API to the client
 
+### Requirement: Live API Integration Verification
+The system SHALL provide a way to verify the autocomplete proxy against the live legacy API in controlled environments.
+
+#### Scenario: Live Autocomplete Success
+- **Given**: The system is configured with valid live credentials.
+- **And**: `LIVE_API_TESTS` is enabled.
+- **When**: A search request is made to the real legacy API via the proxy.
+- **Then**: It MUST return a 200 OK with actual location data.
+

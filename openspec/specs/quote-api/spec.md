@@ -21,3 +21,13 @@ TBD - created by archiving change create-quote-proxy-api. Update Purpose after a
 - **When**: The `QuoteProxyView` receives this error.
 - **Then**: It forwards the status code and error body to the frontend.
 
+### Requirement: Live Quote Integration Verification
+The system SHALL provide a way to verify the quote proxy and token management against the live legacy API in controlled environments.
+
+#### Scenario: Live Quote Selection
+- **Given**: The system is configured with valid live credentials.
+- **And**: `LIVE_API_TESTS` is enabled.
+- **When**: A quote request is made through the proxy.
+- **Then**: It MUST successfully acquire a real token if needed.
+- **And**: It MUST return a 200 OK with actual pricing data from the provider.
+

@@ -9,6 +9,9 @@ from rest_framework import status
 from rest_framework.test import APIClient, APITestCase
 
 from legacy_middleware.models import LegacyAPIToken
+import unittest
+import os
+from django.test import tag
 
 
 class AutocompleteProxyViewTests(TestCase):
@@ -264,3 +267,80 @@ class QuoteProxyViewTestCase(APITestCase):
 
         with self.assertRaises(requests.HTTPError):
             fetch_legacy_token()
+
+
+@tag("integration")
+@unittest.skipUnless(
+    os.environ.get("LIVE_API_TESTS") == "True", "Integration tests skipped"
+)
+class AutocompleteProxyLiveTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("legacy_autocomplete")
+
+    def test_autocomplete_live_success(self):
+        """
+        Verify the Django view returns 200 OK with real data from legacy API.
+        """
+        response = self.client.post(self.url, {"keyword": "Cancun"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        self.assertIn("items", data)
+        # Verify we got some actual results
+        self.assertTrue(len(data["items"]) > 0)
+
+
+@tag("integration")
+@unittest.skipUnless(
+    os.environ.get("LIVE_API_TESTS") == "True", "Integration tests skipped"
+)
+class QuoteProxyLiveTests(APITestCase):
+    def setUp(self):
+        self.url = reverse("legacy_quote")
+
+    def test_quote_live_success(self):
+        """
+        Verify the Django view returns 200 OK with real data from legacy API.
+        This also implicitly tests real token acquisition.
+        """
+        # First, find some real identifiers using the autocomplete proxy
+        autocomplete_url = reverse("legacy_autocomplete")
+        auto_resp = self.client.post(
+            autocomplete_url, {"keyword": "Cancun"}, format="json"
+        )
+        self.assertEqual(auto_resp.status_code, status.HTTP_200_OK)
+        auto_data = auto_resp.json()
+        items = auto_data.get("items", [])
+        self.assertTrue(len(items) >= 2, "Need at least 2 locations for quote test")
+
+        # The legacy API uses 'name' as identifies for quotes in some versions
+        origin_name = items[0]["name"]
+        destination_name = items[1]["name"]
+
+        # Request a quote with real IDs (names)
+        # Use valid type (usually one-way or round-trip) and correct date formats
+        pickup_time = (timezone.now() + timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
+        payload = {
+            "type": "one-way",
+            "start": {
+                "lat": items[0]["geo"]["lat"],
+                "lng": items[0]["geo"]["lng"],
+                "place": items[0]["address"],
+                "pickup": pickup_time,
+            },
+            "end": {
+                "lat": items[1]["geo"]["lat"],
+                "lng": items[1]["geo"]["lng"],
+                "place": items[1]["address"],
+                "pickup": pickup_time,
+            },
+            "passengers": 2,
+            "language": "en",
+            "currency": "USD",
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(
+            response.status_code, status.HTTP_200_OK, f"Quote failed: {response.data}"
+        )
+        data = response.json()
+        self.assertIn("items", data)
