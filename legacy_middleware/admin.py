@@ -1,10 +1,10 @@
 from django.contrib import admin
 from solo.admin import SingletonModelAdmin
+from unfold.admin import ModelAdmin as UnfoldModelAdmin
 from .models import LegacyAPIToken
-
-# Register your models here.
 
 
 @admin.register(LegacyAPIToken)
-class LegacyAPITokenAdmin(SingletonModelAdmin):
+class LegacyAPITokenAdmin(UnfoldModelAdmin, SingletonModelAdmin):
+    # This combines Unfold's UI with Solo's singleton logic
     pass
