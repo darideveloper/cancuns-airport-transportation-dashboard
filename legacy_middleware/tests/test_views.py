@@ -114,7 +114,7 @@ class QuoteProxyViewTestCase(APITestCase):
         mock_oauth.return_value = ("new_token", timezone.now() + timedelta(hours=1))
         mock_quote_resp = MagicMock()
         mock_quote_resp.status_code = 200
-        mock_quote_resp.json.return_value = {"items": []}
+        mock_quote_resp.json.return_value = {"items": [], "places": {}}
         mock_quote.return_value = mock_quote_resp
 
         response = self.client.post(self.url, {}, format="json")
@@ -136,7 +136,7 @@ class QuoteProxyViewTestCase(APITestCase):
 
         mock_quote_resp = MagicMock()
         mock_quote_resp.status_code = 200
-        mock_quote_resp.json.return_value = {"items": []}
+        mock_quote_resp.json.return_value = {"items": [], "places": {}}
         mock_quote.return_value = mock_quote_resp
 
         response = self.client.post(self.url, {}, format="json")
@@ -162,7 +162,7 @@ class QuoteProxyViewTestCase(APITestCase):
         )
         mock_quote_resp = MagicMock()
         mock_quote_resp.status_code = 200
-        mock_quote_resp.json.return_value = {"items": []}
+        mock_quote_resp.json.return_value = {"items": [], "places": {}}
         mock_quote.return_value = mock_quote_resp
 
         response = self.client.post(self.url, {}, format="json")
@@ -191,7 +191,7 @@ class QuoteProxyViewTestCase(APITestCase):
 
         success_resp = MagicMock()
         success_resp.status_code = 200
-        success_resp.json.return_value = {"items": []}
+        success_resp.json.return_value = {"items": [], "places": {}}
 
         mock_quote.side_effect = [fail_resp, success_resp]
 
@@ -226,6 +226,50 @@ class QuoteProxyViewTestCase(APITestCase):
 
         self.assertEqual(response.status_code, 422)
         self.assertEqual(response.data, {"error": "Validation error"})
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_quote")
+    def test_view_no_availability(self, mock_quote, mock_oauth):
+        # Mock token existence
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        mock_quote_resp = MagicMock()
+        mock_quote_resp.status_code = 200
+        # Typical no availability response has an error object
+        error_payload = {"error": {"code": "no_availability", "message": "None found"}}
+        mock_quote_resp.json.return_value = error_payload
+        mock_quote.return_value = mock_quote_resp
+
+        response = self.client.post(self.url, {}, format="json")
+
+        # Must pass through as 200
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, error_payload)
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_quote")
+    def test_view_malformed_response(self, mock_quote, mock_oauth):
+        # Mock token existence
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Case 1: Missing 'items'
+        mock_quote_resp = MagicMock()
+        mock_quote_resp.status_code = 200
+        mock_quote_resp.json.return_value = {"places": {}}
+        mock_quote.return_value = mock_quote_resp
+
+        response = self.client.post(self.url, {}, format="json")
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("Upstream", str(response.data))
+
+        # Case 2: Missing 'places'
+        mock_quote_resp.json.return_value = {"items": []}
+        response = self.client.post(self.url, {}, format="json")
+        self.assertEqual(response.status_code, 502)
 
     @patch("legacy_middleware.services.requests.post")
     def test_service_fetch_token_success(self, mock_post):
@@ -344,3 +388,4 @@ class QuoteProxyLiveTests(APITestCase):
         )
         data = response.json()
         self.assertIn("items", data)
+        self.assertIn("places", data)

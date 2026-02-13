@@ -111,6 +111,24 @@ class QuoteProxyView(APIView):
                     status=status.HTTP_502_BAD_GATEWAY,
                 )
 
+            # Validation Logic
+            if legacy_response.status_code == 200:
+                # 1. Pass through if upstream reports an application-level error (e.g. no_availability)
+                if "error" in data:
+                    return Response(data, status=status.HTTP_200_OK)
+
+                # 2. Validate essential structure for success response
+                has_items = isinstance(data.get("items"), list)
+                has_places = isinstance(data.get("places"), dict)
+
+                if not (has_items and has_places):
+                    return Response(
+                        {
+                            "error": "Upstream response malformed: missing items or places"
+                        },
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
+
             return Response(data, status=legacy_response.status_code)
 
         except requests.RequestException:
