@@ -20,3 +20,4 @@ info.txt
 .DS_Store
 /docs 
 /openspec/changes/*
+*.temp
