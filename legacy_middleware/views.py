@@ -5,6 +5,8 @@ from rest_framework.permissions import AllowAny
 import requests
 
 from .services import fetch_legacy_autocomplete
+from .models import LegacyAPIToken
+from .services import fetch_legacy_token, fetch_quote
 
 
 class AutocompleteProxyView(APIView):
@@ -49,6 +51,68 @@ class AutocompleteProxyView(APIView):
                 )
         except requests.RequestException:
             # Network errors -> 502 Bad Gateway
+            return Response(
+                {"error": "Upstream service unreachable"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+
+class QuoteProxyView(APIView):
+    """
+    Proxy view for the legacy Quote/Search API.
+    Handles token authentication internally.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        # 1. Get valid token
+        token_obj = LegacyAPIToken.get_valid_token()
+
+        if not token_obj:
+            try:
+                token, expires_at = fetch_legacy_token()
+                token_obj = LegacyAPIToken.objects.create(
+                    token=token, expires_at=expires_at
+                )
+            except requests.RequestException:
+                return Response(
+                    {"error": "Upstream authentication failed"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+        # 2. Call quote endpoint
+        try:
+            legacy_response = fetch_quote(token_obj.token, request.data)
+
+            # Handle possible 401 if token expired unexpectedly or was revoked
+            if legacy_response.status_code == 401:
+                # Retry once with new token
+                try:
+                    token, expires_at = fetch_legacy_token()
+                    # We can clear old tokens if we want, but just creating new one is fine
+                    token_obj = LegacyAPIToken.objects.create(
+                        token=token, expires_at=expires_at
+                    )
+                    legacy_response = fetch_quote(token_obj.token, request.data)
+                except requests.RequestException:
+                    return Response(
+                        {"error": "Upstream authentication failed during retry"},
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
+
+            # Pass through the response
+            try:
+                data = legacy_response.json()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid JSON from upstream"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            return Response(data, status=legacy_response.status_code)
+
+        except requests.RequestException:
             return Response(
                 {"error": "Upstream service unreachable"},
                 status=status.HTTP_502_BAD_GATEWAY,
