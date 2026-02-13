@@ -1,14 +1,20 @@
 from django.db import models
 from django.utils import timezone
+from solo.models import SingletonModel
 
 
 # Create your models here.
-class LegacyAPIToken(models.Model):
+class LegacyAPIToken(SingletonModel):
     token = models.TextField()
-    expires_at = models.DateTimeField()
+    expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     @classmethod
     def get_valid_token(cls):
         """Fetch a valid token from the database."""
-        return cls.objects.filter(expires_at__gt=timezone.now()).first()
+        instance = cls.get_solo()
+        if not instance.token or not instance.expires_at:
+            return None
+        if instance.expires_at <= timezone.now():
+            return None
+        return instance

@@ -72,9 +72,10 @@ class QuoteProxyView(APIView):
         if not token_obj:
             try:
                 token, expires_at = fetch_legacy_token()
-                token_obj = LegacyAPIToken.objects.create(
-                    token=token, expires_at=expires_at
-                )
+                token_obj = LegacyAPIToken.get_solo()
+                token_obj.token = token
+                token_obj.expires_at = expires_at
+                token_obj.save()
             except requests.RequestException:
                 return Response(
                     {"error": "Upstream authentication failed"},
@@ -90,10 +91,10 @@ class QuoteProxyView(APIView):
                 # Retry once with new token
                 try:
                     token, expires_at = fetch_legacy_token()
-                    # We can clear old tokens if we want, but just creating new one is fine
-                    token_obj = LegacyAPIToken.objects.create(
-                        token=token, expires_at=expires_at
-                    )
+                    token_obj = LegacyAPIToken.get_solo()
+                    token_obj.token = token
+                    token_obj.expires_at = expires_at
+                    token_obj.save()
                     legacy_response = fetch_quote(token_obj.token, request.data)
                 except requests.RequestException:
                     return Response(

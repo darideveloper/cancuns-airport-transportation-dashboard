@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",
+    "solo",
     # Django apps
     "django.contrib.admin",
     "django.contrib.auth",
