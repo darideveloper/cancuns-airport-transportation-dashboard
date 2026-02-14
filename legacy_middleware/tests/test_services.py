@@ -1,0 +1,169 @@
+from unittest.mock import MagicMock, patch
+
+from django.test import TestCase, override_settings
+
+from legacy_middleware.services import fetch_quote, fetch_reservation_create
+
+
+class FetchReservationCreateTests(TestCase):
+    """
+    Test the fetch_reservation_create service function directly.
+    This verifies parameter injection logic that was previously untested.
+    """
+
+    @override_settings(
+        LEGACY_API_BASE_URL="http://test-api.com",
+        LEGACY_API_SITE_ID="123",
+    )
+    @patch("legacy_middleware.services.requests.post")
+    def test_fetch_reservation_create_injects_site_id(self, mock_post):
+        """
+        Verify site_id is injected from settings when missing in payload.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"reservation_id": "ABC123"}
+        mock_post.return_value = mock_response
+
+        token = "test_token"
+        payload = {"customer_name": "John Doe"}
+
+        result = fetch_reservation_create(token, payload)
+
+        # Verify the request was made
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+
+        # Verify URL
+        self.assertEqual(args[0], "http://test-api.com/api/v1/create")
+
+        # Verify site_id was injected
+        self.assertEqual(kwargs["json"]["site_id"], 123)
+        self.assertEqual(kwargs["json"]["customer_name"], "John Doe")
+
+        # Verify Authorization header
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test_token")
+
+    @override_settings(
+        LEGACY_API_BASE_URL="http://test-api.com",
+        LEGACY_API_SITE_ID="123",
+    )
+    @patch("legacy_middleware.services.requests.post")
+    def test_fetch_reservation_create_preserves_site_id(self, mock_post):
+        """
+        Verify existing site_id in payload is not overwritten.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"reservation_id": "ABC123"}
+        mock_post.return_value = mock_response
+
+        token = "test_token"
+        payload = {"customer_name": "John Doe", "site_id": 999}
+
+        result = fetch_reservation_create(token, payload)
+
+        # Verify the request was made
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+
+        # Verify site_id was NOT overwritten
+        self.assertEqual(kwargs["json"]["site_id"], 999)
+        self.assertEqual(kwargs["json"]["customer_name"], "John Doe")
+
+    @override_settings(
+        LEGACY_API_BASE_URL="http://test-api.com",
+        LEGACY_API_SITE_ID="456",
+    )
+    @patch("legacy_middleware.services.requests.post")
+    def test_fetch_reservation_create_auth_header(self, mock_post):
+        """
+        Verify correct Authorization: Bearer <token> header is sent.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"reservation_id": "XYZ789"}
+        mock_post.return_value = mock_response
+
+        token = "my_secret_token"
+        payload = {"customer_name": "Jane Smith"}
+
+        result = fetch_reservation_create(token, payload)
+
+        # Verify the request was made
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+
+        # Verify Authorization header format
+        self.assertIn("Authorization", kwargs["headers"])
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer my_secret_token")
+
+        # Verify Content-Type header
+        self.assertEqual(kwargs["headers"]["Content-Type"], "application/json")
+
+
+class FetchQuoteTests(TestCase):
+    """
+    Test the fetch_quote service function directly.
+    Bonus cleanup to verify rate_group injection.
+    """
+
+    @override_settings(
+        LEGACY_API_BASE_URL="http://test-api.com",
+        LEGACY_API_RATE_GROUP="premium",
+    )
+    @patch("legacy_middleware.services.requests.post")
+    def test_fetch_quote_injects_rate_group(self, mock_post):
+        """
+        Verify rate_group is injected from settings when missing.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"items": [], "places": {}}
+        mock_post.return_value = mock_response
+
+        token = "test_token"
+        payload = {"origin": "A", "destination": "B"}
+
+        result = fetch_quote(token, payload)
+
+        # Verify the request was made
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+
+        # Verify URL
+        self.assertEqual(args[0], "http://test-api.com/api/v1/quote")
+
+        # Verify rate_group was injected
+        self.assertEqual(kwargs["json"]["rate_group"], "premium")
+        self.assertEqual(kwargs["json"]["origin"], "A")
+        self.assertEqual(kwargs["json"]["destination"], "B")
+
+        # Verify Authorization header
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test_token")
+
+    @override_settings(
+        LEGACY_API_BASE_URL="http://test-api.com",
+        LEGACY_API_RATE_GROUP="premium",
+    )
+    @patch("legacy_middleware.services.requests.post")
+    def test_fetch_quote_preserves_rate_group(self, mock_post):
+        """
+        Verify existing rate_group in payload is not overwritten.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"items": [], "places": {}}
+        mock_post.return_value = mock_response
+
+        token = "test_token"
+        payload = {"origin": "A", "destination": "B", "rate_group": "vip"}
+
+        result = fetch_quote(token, payload)
+
+        # Verify the request was made
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+
+        # Verify rate_group was NOT overwritten
+        self.assertEqual(kwargs["json"]["rate_group"], "vip")

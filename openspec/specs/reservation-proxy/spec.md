@@ -24,3 +24,10 @@ The system SHALL provide a public endpoint that proxies reservation creation req
 - **WHEN** the legacy API is unreachable or returns a 5xx error.
 - **THEN** the system SHALL return a 502 Bad Gateway with a descriptive error message.
 
+### Requirement: Response Validation
+The system MUST validate the structural integrity of successful upstream responses (200 OK) to prevent passing malformed data to the client.
+
+#### Scenario: Malformed Success Response
+- **WHEN** the upstream API returns 200 OK but with missing critical fields (e.g., `reservation_id` or `id`).
+- **THEN** the system SHALL return a 502 Bad Gateway error indicating a malformed response.
+

@@ -389,3 +389,276 @@ class QuoteProxyLiveTests(APITestCase):
         data = response.json()
         self.assertIn("items", data)
         self.assertIn("places", data)
+
+
+class ReservationCreateProxyViewTestCase(APITestCase):
+    """
+    Test the ReservationCreateProxyView in isolation by mocking the service layer.
+    """
+
+    def setUp(self):
+        self.url = reverse("legacy_reservation_create")
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    def test_create_success(self, mock_create, mock_oauth):
+        """
+        Verify 200 OK and valid JSON response for successful reservation creation.
+        """
+        # Setup token
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Mock successful reservation creation
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {
+            "reservation_id": "RES123",
+            "status": "confirmed",
+        }
+        mock_create.return_value = mock_create_resp
+
+        payload = {"customer_name": "John Doe", "email": "john@example.com"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["reservation_id"], "RES123")
+        mock_create.assert_called_once()
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    def test_create_validation_error(self, mock_create, mock_oauth):
+        """
+        Verify 422 Bad Request is forwarded correctly for validation errors.
+        """
+        # Setup token
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Mock 422 validation error
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 422
+        mock_create_resp.json.return_value = {
+            "error": "Invalid email format",
+        }
+        mock_create.return_value = mock_create_resp
+
+        payload = {"customer_name": "John Doe", "email": "invalid"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
+        self.assertIn("error", response.data)
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    def test_token_refresh_retry(self, mock_create, mock_oauth):
+        """
+        Verify 401 triggers token refresh and retry.
+        """
+        # Setup stale token
+        LegacyAPIToken.objects.create(
+            token="stale_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Mock token refresh
+        mock_oauth.return_value = ("fresh_token", timezone.now() + timedelta(hours=1))
+
+        # First call fails with 401, second succeeds
+        fail_resp = MagicMock()
+        fail_resp.status_code = 401
+
+        success_resp = MagicMock()
+        success_resp.status_code = 200
+        success_resp.json.return_value = {"reservation_id": "RES456"}
+
+        mock_create.side_effect = [fail_resp, success_resp]
+
+        payload = {"customer_name": "Jane Smith"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["reservation_id"], "RES456")
+        mock_oauth.assert_called_once()
+        self.assertEqual(mock_create.call_count, 2)
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    def test_upstream_failure(self, mock_create, mock_oauth):
+        """
+        Verify 500/connection error returns 502 Bad Gateway.
+        """
+        # Setup token
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Mock connection error
+        mock_create.side_effect = requests.RequestException("Connection timeout")
+
+        payload = {"customer_name": "Bob Johnson"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn("error", response.data)
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    def test_malformed_response_non_dict(self, mock_create, mock_oauth):
+        """
+        Verify non-dictionary responses return 502.
+        """
+        # Setup token
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Mock response that returns a list instead of dict
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = ["unexpected", "list"]
+        mock_create.return_value = mock_create_resp
+
+        payload = {"customer_name": "Alice Cooper"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn("Upstream response malformed", str(response.data))
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    def test_malformed_response_missing_id(self, mock_create, mock_oauth):
+        """
+        Verify 200 OK without reservation_id/id returns 502.
+        """
+        # Setup token
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Mock response missing reservation_id
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"status": "pending"}  # Missing ID!
+        mock_create.return_value = mock_create_resp
+
+        payload = {"customer_name": "Charlie Brown"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn("missing reservation ID", str(response.data))
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    def test_application_error_passthrough(self, mock_create, mock_oauth):
+        """
+        Verify application-level errors (with 'error' key) are passed through as 200 OK.
+        """
+        # Setup token
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Mock application error response
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {
+            "error": {"code": "booking_failed", "message": "No availability"}
+        }
+        mock_create.return_value = mock_create_resp
+
+        payload = {"customer_name": "David Lee"}
+        response = self.client.post(self.url, payload, format="json")
+
+        # Should pass through as 200 with error payload
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("error", response.data)
+
+
+@tag("integration")
+@unittest.skipUnless(
+    os.environ.get("LIVE_API_TESTS") == "True", "Integration tests skipped"
+)
+class ReservationCreateProxyLiveTests(APITestCase):
+    """
+    Integration tests for ReservationCreateProxyView against the real legacy API.
+    These tests create real data and should only run when LIVE_API_TESTS=True.
+    """
+
+    def setUp(self):
+        self.url = reverse("legacy_reservation_create")
+        self.autocomplete_url = reverse("legacy_autocomplete")
+        self.quote_url = reverse("legacy_quote")
+
+    def test_create_live_success(self):
+        """
+        Verify real creation flow with valid payload.
+        This requires fetching valid location IDs first.
+        """
+        # Step 1: Get valid location IDs using autocomplete
+        auto_resp = self.client.post(
+            self.autocomplete_url, {"keyword": "Cancun"}, format="json"
+        )
+        self.assertEqual(auto_resp.status_code, status.HTTP_200_OK)
+        auto_data = auto_resp.json()
+        items = auto_data.get("items", [])
+        self.assertTrue(len(items) >= 2, "Need at least 2 locations for booking test")
+
+        # Step 2: Get a valid quote to ensure we have proper pricing
+        pickup_time = (timezone.now() + timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
+        quote_payload = {
+            "type": "one-way",
+            "start": {
+                "lat": items[0]["geo"]["lat"],
+                "lng": items[0]["geo"]["lng"],
+                "place": items[0]["address"],
+                "pickup": pickup_time,
+            },
+            "end": {
+                "lat": items[1]["geo"]["lat"],
+                "lng": items[1]["geo"]["lng"],
+                "place": items[1]["address"],
+                "pickup": pickup_time,
+            },
+            "passengers": 2,
+            "language": "en",
+            "currency": "USD",
+        }
+        quote_resp = self.client.post(self.quote_url, quote_payload, format="json")
+        self.assertEqual(quote_resp.status_code, status.HTTP_200_OK)
+        quote_data = quote_resp.json()
+
+        # Check if we got availability
+        if "error" in quote_data:
+            self.skipTest(f"No availability for test dates: {quote_data['error']}")
+
+        self.assertIn("items", quote_data)
+        self.assertTrue(len(quote_data["items"]) > 0, "No transport options available")
+
+        # Step 3: Create a reservation with the first available option
+        first_option = quote_data["items"][0]
+
+        reservation_payload = {
+            "customer_name": "Test User",
+            "customer_email": "test@example.com",
+            "customer_phone": "+1234567890",
+            "transport_id": first_option.get("id"),
+            "pickup_time": pickup_time,
+            "passengers": 2,
+            # Add any other required fields based on the API documentation
+        }
+
+        response = self.client.post(self.url, reservation_payload, format="json")
+
+        # Verify we got a successful response
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+            f"Reservation failed: {response.data}",
+        )
+        data = response.json()
+
+        # Verify we got a reservation ID (either 'reservation_id' or 'id')
+        has_id = "reservation_id" in data or "id" in data
+        self.assertTrue(has_id, f"Response missing reservation ID: {data}")

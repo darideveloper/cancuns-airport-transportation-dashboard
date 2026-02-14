@@ -148,5 +148,37 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
     Handles token authentication internally.
     """
 
+    def validate_reservation_response(self, data):
+        """
+        Validate the structure of a successful reservation creation response.
+
+        Returns None if valid, or a Response object with error details if invalid.
+        """
+        # 0. Safety check: Ensure data is a dictionary
+        if not isinstance(data, dict):
+            return Response(
+                {"error": "Upstream response malformed: expected JSON object"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # 1. Pass through if upstream reports an application-level error
+        if "error" in data:
+            return None
+
+        # 2. Check for success indicators
+        # The legacy API typically returns 'reservation_id' or 'id' on success.
+        has_id = "reservation_id" in data or "id" in data
+
+        if not has_id:
+            return Response(
+                {"error": "Upstream response malformed: missing reservation ID"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return None
+
     def post(self, request, *args, **kwargs):
-        return self.execute_proxy_request(fetch_reservation_create, request.data)
+        return self.execute_proxy_request(
+            fetch_reservation_create,
+            request.data,
+            validate_func=self.validate_reservation_response,
+        )
