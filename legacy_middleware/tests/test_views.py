@@ -419,7 +419,13 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         }
         mock_create.return_value = mock_create_resp
 
-        payload = {"customer_name": "John Doe", "email": "john@example.com"}
+        payload = {
+            "first_name": "John",
+            "last_name": "Doe",
+            "email_address": "john@example.com",
+            "phone": "+1234567890",
+            "service_token": "valid_token_from_quote",
+        }
         response = self.client.post(self.url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -445,7 +451,11 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         }
         mock_create.return_value = mock_create_resp
 
-        payload = {"customer_name": "John Doe", "email": "invalid"}
+        payload = {
+            "first_name": "John",
+            "email_address": "invalid",
+            "service_token": "some_token",
+        }
         response = self.client.post(self.url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
@@ -475,7 +485,11 @@ class ReservationCreateProxyViewTestCase(APITestCase):
 
         mock_create.side_effect = [fail_resp, success_resp]
 
-        payload = {"customer_name": "Jane Smith"}
+        payload = {
+            "first_name": "Jane Smith",
+            "email_address": "jane@example.com",
+            "service_token": "some_token",
+        }
         response = self.client.post(self.url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -497,7 +511,11 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         # Mock connection error
         mock_create.side_effect = requests.RequestException("Connection timeout")
 
-        payload = {"customer_name": "Bob Johnson"}
+        payload = {
+            "first_name": "Bob Johnson",
+            "email_address": "bob@example.com",
+            "service_token": "some_token",
+        }
         response = self.client.post(self.url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
@@ -520,7 +538,11 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         mock_create_resp.json.return_value = ["unexpected", "list"]
         mock_create.return_value = mock_create_resp
 
-        payload = {"customer_name": "Alice Cooper"}
+        payload = {
+            "first_name": "Alice Cooper",
+            "email_address": "alice@example.com",
+            "service_token": "some_token",
+        }
         response = self.client.post(self.url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
@@ -543,7 +565,11 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         mock_create_resp.json.return_value = {"status": "pending"}  # Missing ID!
         mock_create.return_value = mock_create_resp
 
-        payload = {"customer_name": "Charlie Brown"}
+        payload = {
+            "first_name": "Charlie Brown",
+            "email_address": "charlie@example.com",
+            "service_token": "some_token",
+        }
         response = self.client.post(self.url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
@@ -568,7 +594,11 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         }
         mock_create.return_value = mock_create_resp
 
-        payload = {"customer_name": "David Lee"}
+        payload = {
+            "first_name": "David Lee",
+            "email_address": "david@example.com",
+            "service_token": "some_token",
+        }
         response = self.client.post(self.url, payload, format="json")
 
         # Should pass through as 200 with error payload
@@ -640,13 +670,13 @@ class ReservationCreateProxyLiveTests(APITestCase):
         first_option = quote_data["items"][0]
 
         reservation_payload = {
-            "customer_name": "Test User",
-            "customer_email": "test@example.com",
-            "customer_phone": "+1234567890",
-            "transport_id": first_option.get("id"),
-            "pickup_time": pickup_time,
-            "passengers": 2,
-            # Add any other required fields based on the API documentation
+            "first_name": "Test",
+            "last_name": "User",
+            "email_address": "test@example.com",
+            "phone": "+1234567890",
+            "service_token": first_option.get("token"),
+            "flight_number": "AA 1234",
+            "pay_at_arrival": 1,  # Use cash to avoid needing additional payment params
         }
 
         response = self.client.post(self.url, reservation_payload, format="json")
@@ -659,6 +689,14 @@ class ReservationCreateProxyLiveTests(APITestCase):
         )
         data = response.json()
 
-        # Verify we got a reservation ID (either 'reservation_id' or 'id')
-        has_id = "reservation_id" in data or "id" in data
+        # Verify we got a reservation ID (could be in config.id or top-level id/reservation_id)
+        has_id = (
+            "reservation_id" in data
+            or "id" in data
+            or (
+                "config" in data
+                and isinstance(data["config"], dict)
+                and "id" in data["config"]
+            )
+        )
         self.assertTrue(has_id, f"Response missing reservation ID: {data}")

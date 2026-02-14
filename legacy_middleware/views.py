@@ -166,8 +166,17 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
             return None
 
         # 2. Check for success indicators
-        # The legacy API typically returns 'reservation_id' or 'id' on success.
-        has_id = "reservation_id" in data or "id" in data
+        # The legacy API typically returns 'reservation_id' or 'id' on success,
+        # often nested inside a 'config' object.
+        has_id = (
+            "reservation_id" in data
+            or "id" in data
+            or (
+                "config" in data
+                and isinstance(data["config"], dict)
+                and ("id" in data["config"] or "code" in data["config"])
+            )
+        )
 
         if not has_id:
             return Response(
