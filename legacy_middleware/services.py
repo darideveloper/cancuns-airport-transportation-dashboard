@@ -2,6 +2,31 @@ import requests
 from django.conf import settings
 
 
+def _post_to_legacy(
+    endpoint: str,
+    payload: dict,
+    token: str = None,
+    headers: dict = None,
+    timeout: int = 10,
+) -> requests.Response:
+    """
+    Internal helper to send a POST request to the legacy API.
+    """
+    url = f"{settings.LEGACY_API_BASE_URL.rstrip('/')}/{endpoint.lstrip('/')}"
+
+    final_headers = {
+        "Content-Type": "application/json",
+    }
+
+    if token:
+        final_headers["Authorization"] = f"Bearer {token}"
+
+    if headers:
+        final_headers.update(headers)
+
+    return requests.post(url, json=payload, headers=final_headers, timeout=timeout)
+
+
 def fetch_legacy_autocomplete(keyword: str) -> requests.Response:
     """
     Fetch autocomplete results from the legacy API.
@@ -12,19 +37,10 @@ def fetch_legacy_autocomplete(keyword: str) -> requests.Response:
     Returns:
         requests.Response: The response from the legacy API.
     """
-    url = f"{settings.LEGACY_API_BASE_URL.rstrip('/')}/api/v1/autocomplete-affiliates"
-    headers = {
-        "Content-Type": "application/json",
-        "app-key": settings.LEGACY_API_KEY,
-    }
+    headers = {"app-key": settings.LEGACY_API_KEY}
     payload = {"keyword": keyword}
 
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        return response
-    except requests.RequestException as e:
-        # re-raise to be handled by the view
-        raise e
+    return _post_to_legacy("api/v1/autocomplete-affiliates", payload, headers=headers)
 
 
 def fetch_legacy_token():
@@ -34,13 +50,12 @@ def fetch_legacy_token():
     Returns:
         tuple: (token, expires_at)
     """
-    url = f"{settings.LEGACY_API_BASE_URL.rstrip('/')}/api/v1/oauth"
     payload = {
         "user": settings.LEGACY_API_USER,
         "secret": settings.LEGACY_API_SECRET,
     }
 
-    response = requests.post(url, json=payload, timeout=10)
+    response = _post_to_legacy("api/v1/oauth", payload)
     response.raise_for_status()
     data = response.json()
 
@@ -67,18 +82,11 @@ def fetch_quote(token, payload):
     Returns:
         requests.Response: The response from the legacy API.
     """
-    url = f"{settings.LEGACY_API_BASE_URL.rstrip('/')}/api/v1/quote"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-
     # Inject default rate_group if missing
     if "rate_group" not in payload and settings.LEGACY_API_RATE_GROUP:
         payload["rate_group"] = settings.LEGACY_API_RATE_GROUP
 
-    response = requests.post(url, json=payload, headers=headers, timeout=10)
-    return response
+    return _post_to_legacy("api/v1/quote", payload, token=token)
 
 
 def fetch_reservation_create(token, payload):
@@ -92,15 +100,8 @@ def fetch_reservation_create(token, payload):
     Returns:
         requests.Response: The response from the legacy API.
     """
-    url = f"{settings.LEGACY_API_BASE_URL.rstrip('/')}/api/v1/create"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-
     # Inject default site_id if missing
     if "site_id" not in payload and settings.LEGACY_API_SITE_ID:
         payload["site_id"] = int(settings.LEGACY_API_SITE_ID)
 
-    response = requests.post(url, json=payload, headers=headers, timeout=10)
-    return response
+    return _post_to_legacy("api/v1/create", payload, token=token)
