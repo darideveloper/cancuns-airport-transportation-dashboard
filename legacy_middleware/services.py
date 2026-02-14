@@ -79,3 +79,28 @@ def fetch_quote(token, payload):
 
     response = requests.post(url, json=payload, headers=headers, timeout=10)
     return response
+
+
+def fetch_reservation_create(token, payload):
+    """
+    Create a new reservation in the legacy API.
+
+    Args:
+        token (str): The OAuth token.
+        payload (dict): The reservation creation payload.
+
+    Returns:
+        requests.Response: The response from the legacy API.
+    """
+    url = f"{settings.LEGACY_API_BASE_URL.rstrip('/')}/api/v1/create"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    # Inject default site_id if missing
+    if "site_id" not in payload and settings.LEGACY_API_SITE_ID:
+        payload["site_id"] = int(settings.LEGACY_API_SITE_ID)
+
+    response = requests.post(url, json=payload, headers=headers, timeout=10)
+    return response

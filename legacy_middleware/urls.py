@@ -1,5 +1,9 @@
 from django.urls import path
-from .views import AutocompleteProxyView, QuoteProxyView
+from .views import (
+    AutocompleteProxyView,
+    QuoteProxyView,
+    ReservationCreateProxyView,
+)
 
 urlpatterns = [
     path(
@@ -8,4 +12,9 @@ urlpatterns = [
         name="legacy_autocomplete",
     ),
     path("legacy/quote/", QuoteProxyView.as_view(), name="legacy_quote"),
+    path(
+        "legacy/create/",
+        ReservationCreateProxyView.as_view(),
+        name="legacy_reservation_create",
+    ),
 ]

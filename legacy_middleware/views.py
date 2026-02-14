@@ -6,7 +6,7 @@ import requests
 
 from .services import fetch_legacy_autocomplete
 from .models import LegacyAPIToken
-from .services import fetch_legacy_token, fetch_quote
+from .services import fetch_legacy_token, fetch_quote, fetch_reservation_create
 
 
 class AutocompleteProxyView(APIView):
@@ -129,6 +129,72 @@ class QuoteProxyView(APIView):
                         status=status.HTTP_502_BAD_GATEWAY,
                     )
 
+            return Response(data, status=legacy_response.status_code)
+
+        except requests.RequestException:
+            return Response(
+                {"error": "Upstream service unreachable"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+
+class ReservationCreateProxyView(APIView):
+    """
+    Proxy view for the legacy Reservation Create API.
+    Handles token authentication internally.
+    """
+
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        # 1. Get valid token
+        token_obj = LegacyAPIToken.get_valid_token()
+
+        if not token_obj:
+            try:
+                token, expires_at = fetch_legacy_token()
+                token_obj = LegacyAPIToken.get_solo()
+                token_obj.token = token
+                token_obj.expires_at = expires_at
+                token_obj.save()
+            except requests.RequestException:
+                return Response(
+                    {"error": "Upstream authentication failed"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+        # 2. Call create reservation endpoint
+        try:
+            legacy_response = fetch_reservation_create(token_obj.token, request.data)
+
+            # Handle possible 401 if token expired unexpectedly or was revoked
+            if legacy_response.status_code == 401:
+                # Retry once with new token
+                try:
+                    token, expires_at = fetch_legacy_token()
+                    token_obj = LegacyAPIToken.get_solo()
+                    token_obj.token = token
+                    token_obj.expires_at = expires_at
+                    token_obj.save()
+                    legacy_response = fetch_reservation_create(
+                        token_obj.token, request.data
+                    )
+                except requests.RequestException:
+                    return Response(
+                        {"error": "Upstream authentication failed during retry"},
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
+
+            # Pass through the response
+            try:
+                data = legacy_response.json()
+            except ValueError:
+                return Response(
+                    {"error": "Invalid JSON from upstream"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            # Design specifically mentions forwarding 422 errors which contain validation messages
             return Response(data, status=legacy_response.status_code)
 
         except requests.RequestException:
