@@ -2,7 +2,11 @@ from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 
-from legacy_middleware.services import fetch_quote, fetch_reservation_create
+from legacy_middleware.services import (
+    fetch_quote,
+    fetch_reservation_create,
+    fetch_payment_link,
+)
 
 
 class FetchReservationCreateTests(TestCase):
@@ -28,7 +32,7 @@ class FetchReservationCreateTests(TestCase):
         token = "test_token"
         payload = {"customer_name": "John Doe"}
 
-        result = fetch_reservation_create(token, payload)
+        fetch_reservation_create(token, payload)
 
         # Verify the request was made
         mock_post.assert_called_once()
@@ -61,7 +65,7 @@ class FetchReservationCreateTests(TestCase):
         token = "test_token"
         payload = {"customer_name": "John Doe", "site_id": 999}
 
-        result = fetch_reservation_create(token, payload)
+        fetch_reservation_create(token, payload)
 
         # Verify the request was made
         mock_post.assert_called_once()
@@ -88,7 +92,7 @@ class FetchReservationCreateTests(TestCase):
         token = "my_secret_token"
         payload = {"customer_name": "Jane Smith"}
 
-        result = fetch_reservation_create(token, payload)
+        fetch_reservation_create(token, payload)
 
         # Verify the request was made
         mock_post.assert_called_once()
@@ -125,7 +129,7 @@ class FetchQuoteTests(TestCase):
         token = "test_token"
         payload = {"origin": "A", "destination": "B"}
 
-        result = fetch_quote(token, payload)
+        fetch_quote(token, payload)
 
         # Verify the request was made
         mock_post.assert_called_once()
@@ -159,7 +163,7 @@ class FetchQuoteTests(TestCase):
         token = "test_token"
         payload = {"origin": "A", "destination": "B", "rate_group": "vip"}
 
-        result = fetch_quote(token, payload)
+        fetch_quote(token, payload)
 
         # Verify the request was made
         mock_post.assert_called_once()
@@ -167,3 +171,54 @@ class FetchQuoteTests(TestCase):
 
         # Verify rate_group was NOT overwritten
         self.assertEqual(kwargs["json"]["rate_group"], "vip")
+
+
+class FetchPaymentLinkTests(TestCase):
+    """
+    Test the fetch_payment_link service function.
+    """
+
+    @override_settings(
+        LEGACY_API_BASE_URL="http://test-api.com",
+    )
+    @patch("legacy_middleware.services.requests.get")
+    def test_fetch_payment_link_calls_correct_endpoint(self, mock_get):
+        """
+        Verify correct URL, method, and parameters are passed.
+        """
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"url": "http://stripe.com/pay"}
+        mock_get.return_value = mock_response
+
+        token = "test_token"
+        reservation_id = 12345
+        payment_provider = "STRIPE"
+        language = "en"
+        success_url = "http://success.com"
+        cancel_url = "http://cancel.com"
+
+        fetch_payment_link(
+            token, reservation_id, payment_provider, language, success_url, cancel_url
+        )
+
+        mock_get.assert_called_once()
+        args, kwargs = mock_get.call_args
+
+        # Verify URL
+        self.assertEqual(
+            args[0], "http://test-api.com/api/v1/reservation/payment/handler"
+        )
+
+        # Verify Headers
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test_token")
+
+        # Verify Params
+        expected_params = {
+            "type": "STRIPE",
+            "id": 12345,
+            "language": "en",
+            "success_url": "http://success.com",
+            "cancel_url": "http://cancel.com",
+        }
+        self.assertEqual(kwargs["params"], expected_params)

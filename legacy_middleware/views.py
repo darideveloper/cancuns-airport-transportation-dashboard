@@ -6,7 +6,12 @@ import requests
 
 from .services import fetch_legacy_autocomplete
 from .models import LegacyAPIToken
-from .services import fetch_legacy_token, fetch_quote, fetch_reservation_create
+from .services import (
+    fetch_legacy_token,
+    fetch_quote,
+    fetch_reservation_create,
+    fetch_payment_link,
+)
 
 
 class BaseLegacyProxyView(APIView):
@@ -185,9 +190,86 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
             )
         return None
 
+    def extract_reservation_id(self, data):
+        """Helper to safely extract the reservation ID from various response formats."""
+        if isinstance(data, dict):
+            if "reservation_id" in data:
+                return data["reservation_id"]
+            if "id" in data:
+                return data["id"]
+            if "config" in data and isinstance(data["config"], dict):
+                if "id" in data["config"]:
+                    return data["config"]["id"]
+                if "code" in data["config"]:
+                    return data["config"]["code"]
+        return None
+
     def post(self, request, *args, **kwargs):
-        return self.execute_proxy_request(
+        # 1. Create Reservation
+        response = self.execute_proxy_request(
             fetch_reservation_create,
             request.data,
             validate_func=self.validate_reservation_response,
         )
+
+        if response.status_code != 200:
+            return response
+
+        # 2. Check for Payment Generation Requirement (Stripe/PayPal)
+        # Convert to string to avoid AttributeError if None
+        val = request.data.get("payment_method")
+        payment_method = str(val).upper() if val else ""
+
+        if payment_method in ["STRIPE", "PAYPAL"]:
+            reservation_data = response.data
+            reservation_id = self.extract_reservation_id(reservation_data)
+
+            # Fallback if extract helper failed but validation passed (should be rare)
+            if not reservation_id:
+                return Response(
+                    {
+                        "error": "Failed to extract reservation ID for payment link generation"
+                    },
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            # 3. Get Payment Link
+            try:
+                # Reuse token from cache handling in base view
+                token_obj = self.get_legacy_token()
+
+                # Fetch payment link
+                payment_response = fetch_payment_link(
+                    token=token_obj.token,
+                    reservation_id=reservation_id,
+                    payment_provider=payment_method,
+                    language=request.data.get("language", "en"),
+                    success_url=request.data.get("success_url"),
+                    cancel_url=request.data.get("cancel_url"),
+                )
+
+                # Raise error if non-200
+                payment_response.raise_for_status()
+
+                # Parse JSON
+                try:
+                    link_data = payment_response.json()
+                except ValueError:
+                    return Response(
+                        {"error": "Invalid JSON from payment provider upstream"},
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
+
+                # 4. Return ONLY the payment link
+                return Response(
+                    {"payment_link": link_data.get("url")}, status=status.HTTP_200_OK
+                )
+
+            except Exception:
+                # Catch requests.RequestException or other errors
+                return Response(
+                    {"error": "Failed to generate payment link"},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+        return response

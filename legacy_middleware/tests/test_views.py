@@ -605,6 +605,162 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("error", response.data)
 
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    @patch("legacy_middleware.views.fetch_payment_link")
+    def test_create_success_stripe(self, mock_payment, mock_create, mock_oauth):
+        """
+        Verify Stripe payment method triggers payment link generation.
+        """
+        # Setup token
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        # Mock successful reservation
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"reservation_id": "RES100"}
+        mock_create.return_value = mock_create_resp
+
+        # Mock successful payment link
+        mock_payment_resp = MagicMock()
+        mock_payment_resp.status_code = 200
+        mock_payment_resp.json.return_value = {"url": "http://stripe.com/pay/123"}
+        mock_payment.return_value = mock_payment_resp
+
+        payload = {
+            "first_name": "Stripe User",
+            "email_address": "stripe@example.com",
+            "service_token": "token",
+            "payment_method": "STRIPE",
+            "success_url": "http://ok.com",
+            "cancel_url": "http://no.com",
+        }
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"payment_link": "http://stripe.com/pay/123"})
+
+        # Verify calls
+        mock_create.assert_called_once()
+        mock_payment.assert_called_once()
+        # Verify payment call args
+        args, kwargs = mock_payment.call_args
+        self.assertEqual(kwargs["reservation_id"], "RES100")
+        self.assertEqual(kwargs["payment_provider"], "STRIPE")
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    @patch("legacy_middleware.views.fetch_payment_link")
+    def test_create_success_paypal(self, mock_payment, mock_create, mock_oauth):
+        """
+        Verify PayPal payment method triggers payment link generation.
+        """
+        # Setup token
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"config": {"id": "RES200"}}
+        mock_create.return_value = mock_create_resp
+
+        mock_payment_resp = MagicMock()
+        mock_payment_resp.status_code = 200
+        mock_payment_resp.json.return_value = {"url": "http://paypal.com/pay/456"}
+        mock_payment.return_value = mock_payment_resp
+
+        payload = {
+            "first_name": "PayPal User",
+            "email_address": "paypal@example.com",
+            "service_token": "token",
+            "payment_method": "PAYPAL",
+        }
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"payment_link": "http://paypal.com/pay/456"})
+
+        # Verify calls
+        mock_create.assert_called_once()
+        mock_payment.assert_called_once()
+        args, kwargs = mock_payment.call_args
+        self.assertEqual(kwargs["reservation_id"], "RES200")
+        self.assertEqual(kwargs["payment_provider"], "PAYPAL")
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    @patch("legacy_middleware.views.fetch_payment_link")
+    def test_create_payment_link_failure(self, mock_payment, mock_create, mock_oauth):
+        """
+        Verify 502 if payment link generation fails.
+        """
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"reservation_id": "RES300"}
+        mock_create.return_value = mock_create_resp
+
+        # Mock payment link failure
+        mock_payment.side_effect = requests.RequestException("Upstream error")
+
+        payload = {
+            "first_name": "Fail User",
+            "email_address": "fail@example.com",
+            "service_token": "token",
+            "payment_method": "STRIPE",
+        }
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn("error", response.data)
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    @patch("legacy_middleware.views.fetch_payment_link")
+    def test_create_cash_ignored(self, mock_payment, mock_create, mock_oauth):
+        """
+        Verify 'CASH' or missing payment method skips payment link generation.
+        """
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"reservation_id": "RES_CASH"}
+        mock_create.return_value = mock_create_resp
+
+        # Case 1: CASH
+        payload = {
+            "first_name": "Cash User",
+            "email_address": "cash@example.com",
+            "service_token": "token",
+            "payment_method": "CASH",
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, {"reservation_id": "RES_CASH"})
+        mock_payment.assert_not_called()
+
+        # Case 2: Missing
+        payload2 = {
+            "first_name": "No Method User",
+            "email_address": "no@example.com",
+            "service_token": "token",
+        }
+        response2 = self.client.post(self.url, payload2, format="json")
+        self.assertEqual(response2.status_code, status.HTTP_200_OK)
+        # Note: Depending on execute_proxy_request return logic, response2.data might be just dict or Response object content.
+        # But in test_create_success, we asserted .data["reservation_id"]. So it's fine.
+        self.assertEqual(response2.data, {"reservation_id": "RES_CASH"})
+        mock_payment.assert_not_called()
+
 
 @tag("integration")
 @unittest.skipUnless(

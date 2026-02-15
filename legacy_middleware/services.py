@@ -2,15 +2,17 @@ import requests
 from django.conf import settings
 
 
-def _post_to_legacy(
+def _legacy_request(
     endpoint: str,
-    payload: dict,
+    method: str = "POST",
+    payload: dict = None,
+    params: dict = None,
     token: str = None,
     headers: dict = None,
     timeout: int = 10,
 ) -> requests.Response:
     """
-    Internal helper to send a POST request to the legacy API.
+    Internal helper to send a request to the legacy API.
     """
     url = f"{settings.LEGACY_API_BASE_URL.rstrip('/')}/{endpoint.lstrip('/')}"
 
@@ -24,7 +26,21 @@ def _post_to_legacy(
     if headers:
         final_headers.update(headers)
 
-    return requests.post(url, json=payload, headers=final_headers, timeout=timeout)
+    if method.upper() == "POST":
+        return requests.post(
+            url, json=payload, headers=final_headers, timeout=timeout, params=params
+        )
+    elif method.upper() == "GET":
+        return requests.get(url, headers=final_headers, timeout=timeout, params=params)
+    else:
+        return requests.request(
+            method,
+            url,
+            json=payload,
+            headers=final_headers,
+            timeout=timeout,
+            params=params,
+        )
 
 
 def fetch_legacy_autocomplete(keyword: str) -> requests.Response:
@@ -40,7 +56,12 @@ def fetch_legacy_autocomplete(keyword: str) -> requests.Response:
     headers = {"app-key": settings.LEGACY_API_KEY}
     payload = {"keyword": keyword}
 
-    return _post_to_legacy("api/v1/autocomplete-affiliates", payload, headers=headers)
+    return _legacy_request(
+        "api/v1/autocomplete-affiliates",
+        method="POST",
+        payload=payload,
+        headers=headers,
+    )
 
 
 def fetch_legacy_token():
@@ -55,7 +76,7 @@ def fetch_legacy_token():
         "secret": settings.LEGACY_API_SECRET,
     }
 
-    response = _post_to_legacy("api/v1/oauth", payload)
+    response = _legacy_request("api/v1/oauth", method="POST", payload=payload)
     response.raise_for_status()
     data = response.json()
 
@@ -86,7 +107,7 @@ def fetch_quote(token, payload):
     if "rate_group" not in payload and settings.LEGACY_API_RATE_GROUP:
         payload["rate_group"] = settings.LEGACY_API_RATE_GROUP
 
-    return _post_to_legacy("api/v1/quote", payload, token=token)
+    return _legacy_request("api/v1/quote", method="POST", payload=payload, token=token)
 
 
 def fetch_reservation_create(token, payload):
@@ -104,4 +125,37 @@ def fetch_reservation_create(token, payload):
     if "site_id" not in payload and settings.LEGACY_API_SITE_ID:
         payload["site_id"] = int(settings.LEGACY_API_SITE_ID)
 
-    return _post_to_legacy("api/v1/create", payload, token=token)
+    return _legacy_request("api/v1/create", method="POST", payload=payload, token=token)
+
+
+def fetch_payment_link(
+    token, reservation_id, payment_provider, language, success_url, cancel_url
+):
+    """
+    Fetch the payment link for a reservation.
+    GET /api/v1/reservation/payment/handler
+
+    Args:
+        token (str): The OAuth token.
+        reservation_id (str/int): The reservation ID.
+        payment_provider (str): 'STRIPE' or 'PAYPAL'.
+        language (str): Language code (e.g. 'en').
+        success_url (str): Redirect URL on success.
+        cancel_url (str): Redirect URL on cancel.
+
+    Returns:
+        requests.Response: The response containing the payment link.
+    """
+    params = {
+        "type": payment_provider,
+        "id": reservation_id,
+        "language": language,
+        "success_url": success_url,
+        "cancel_url": cancel_url,
+    }
+    return _legacy_request(
+        "api/v1/reservation/payment/handler",
+        method="GET",
+        params=params,
+        token=token,
+    )
