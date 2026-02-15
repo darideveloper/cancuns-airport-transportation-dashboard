@@ -238,14 +238,28 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                 # Reuse token from cache handling in base view
                 token_obj = self.get_legacy_token()
 
+                # WORKAROUND: Force relative paths to avoid "http://..." doubling
+                # This means localhost users will be redirected to cancunsairporttransportation.com
+                from urllib.parse import urlparse
+
+                cancel_val = request.data.get("cancel_url")
+                success_val = request.data.get("success_url")
+
+                # Helper to strip domain
+                def to_relative(url):
+                    if not url:
+                        return url
+                    parsed = urlparse(str(url))
+                    return parsed.path if parsed.path else str(url)
+
                 # Fetch payment link
                 payment_response = fetch_payment_link(
                     token=token_obj.token,
                     reservation_id=reservation_id,
                     payment_provider=payment_method,
                     language=request.data.get("language", "en"),
-                    success_url=request.data.get("success_url"),
-                    cancel_url=request.data.get("cancel_url"),
+                    success_url=to_relative(success_val),
+                    cancel_url=to_relative(cancel_val),
                 )
 
                 # Raise error if non-200
