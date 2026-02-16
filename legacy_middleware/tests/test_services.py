@@ -6,6 +6,7 @@ from legacy_middleware.services import (
     fetch_quote,
     fetch_reservation_create,
     fetch_payment_link,
+    fetch_my_booking,
 )
 
 
@@ -222,3 +223,31 @@ class FetchPaymentLinkTests(TestCase):
             "cancel_url": "http://cancel.com",
         }
         self.assertEqual(kwargs["params"], expected_params)
+
+
+class FetchMyBookingServiceTests(TestCase):
+    """
+    Unit tests for the fetch_my_booking service function.
+    """
+
+    @override_settings(
+        LEGACY_API_BASE_URL="http://test-api.com", LEGACY_API_SITE_ID="25"
+    )
+    @patch("legacy_middleware.services.requests.post")
+    def test_fetch_my_booking_calls_correct_endpoint(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"status": "CONFIRMED"}
+        mock_post.return_value = mock_response
+
+        token = "test_token"
+        payload = {"code": "ABC123", "email": "test@example.com", "language": "en"}
+        response = fetch_my_booking(token, payload)
+
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        self.assertEqual(args[0], "http://test-api.com/api/v1/reservation/get")
+        self.assertEqual(kwargs["json"]["code"], "ABC123")
+        self.assertEqual(kwargs["json"]["site_id"], 25)
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test_token")
+        self.assertEqual(response.status_code, 200)

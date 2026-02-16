@@ -762,6 +762,113 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         mock_payment.assert_not_called()
 
 
+class MyBookingProxyViewTests(TestCase):
+    """
+    Integration tests for MyBookingProxyView using mocked services.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("legacy_my_booking")
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+    @patch("legacy_middleware.views.fetch_my_booking")
+    def test_my_booking_success(self, mock_fetch):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        expected_data = {
+            "status": "CONFIRMED",
+            "client": {"first_name": "John"},
+            "items": {"ABC123": {"service_type_name": "Private Van"}},
+        }
+        mock_response.json.return_value = expected_data
+        mock_fetch.return_value = mock_response
+
+        payload = {"code": "ABC123", "email": "john@example.com"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), expected_data)
+        # Verify token was passed
+        args, _ = mock_fetch.call_args
+        self.assertEqual(args[0], "valid_token")
+
+    @patch("legacy_middleware.views.fetch_legacy_token")
+    @patch("legacy_middleware.views.fetch_my_booking")
+    def test_my_booking_token_refresh_retry(self, mock_fetch, mock_oauth):
+        """Test token expiration and retry logic"""
+        mock_oauth.return_value = ("fresh_token", timezone.now() + timedelta(hours=1))
+
+        # First call fails 401, second success
+        fail_resp = MagicMock()
+        fail_resp.status_code = 401
+
+        success_resp = MagicMock()
+        success_resp.status_code = 200
+        success_resp.json.return_value = {"status": "CONFIRMED", "items": {}}
+
+        mock_fetch.side_effect = [fail_resp, success_resp]
+
+        payload = {"code": "ABC123", "email": "john@example.com"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(mock_fetch.call_count, 2)
+        mock_oauth.assert_called_once()
+
+    def test_my_booking_missing_params(self):
+        # Missing email
+        response = self.client.post(self.url, {"code": "ABC123"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", response.data)
+
+        # Missing code
+        response = self.client.post(
+            self.url, {"email": "john@example.com"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("legacy_middleware.views.fetch_my_booking")
+    def test_my_booking_upstream_error(self, mock_fetch):
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.json.return_value = {"error": "Reservation not found"}
+        mock_fetch.return_value = mock_response
+
+        payload = {"code": "WRONG", "email": "john@example.com"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data, {"error": "Reservation not found"})
+
+    @patch("legacy_middleware.views.fetch_my_booking")
+    def test_my_booking_malformed_response(self, mock_fetch):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "unexpected": "data"
+        }  # Missing status and items
+        mock_fetch.return_value = mock_response
+
+        payload = {"code": "ABC123", "email": "john@example.com"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn("Upstream response malformed", response.data["error"])
+
+    @patch("legacy_middleware.views.fetch_my_booking")
+    def test_my_booking_upstream_exception(self, mock_fetch):
+        mock_fetch.side_effect = requests.RequestException("Timeout")
+
+        payload = {"code": "ABC123", "email": "john@example.com"}
+        response = self.client.post(self.url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertIn("Upstream service unreachable", response.data["error"])
+
+
 @tag("integration")
 @unittest.skipUnless(
     os.environ.get("LIVE_API_TESTS") == "True", "Integration tests skipped"

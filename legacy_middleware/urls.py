@@ -3,6 +3,7 @@ from .views import (
     AutocompleteProxyView,
     QuoteProxyView,
     ReservationCreateProxyView,
+    MyBookingProxyView,
 )
 
 urlpatterns = [
@@ -16,5 +17,10 @@ urlpatterns = [
         "legacy/create/",
         ReservationCreateProxyView.as_view(),
         name="legacy_reservation_create",
+    ),
+    path(
+        "legacy/my-booking/",
+        MyBookingProxyView.as_view(),
+        name="legacy_my_booking",
     ),
 ]

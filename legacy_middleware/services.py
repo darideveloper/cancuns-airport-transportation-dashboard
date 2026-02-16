@@ -159,3 +159,24 @@ def fetch_payment_link(
         params=params,
         token=token,
     )
+
+
+def fetch_my_booking(token, payload):
+    """
+    Fetch reservation details from the legacy API.
+    POST /api/v1/reservation/get
+
+    Args:
+        token (str): The OAuth token.
+        payload (dict): contains 'code', 'email', 'language'.
+
+    Returns:
+        requests.Response: The response from the legacy API.
+    """
+    # Inject default site_id if missing
+    if "site_id" not in payload and settings.LEGACY_API_SITE_ID:
+        payload["site_id"] = int(settings.LEGACY_API_SITE_ID)
+
+    return _legacy_request(
+        "api/v1/reservation/get", method="POST", payload=payload, token=token
+    )

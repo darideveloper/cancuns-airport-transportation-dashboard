@@ -11,6 +11,7 @@ from .services import (
     fetch_quote,
     fetch_reservation_create,
     fetch_payment_link,
+    fetch_my_booking,
 )
 
 
@@ -287,3 +288,50 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                 )
 
         return response
+
+
+class MyBookingProxyView(BaseLegacyProxyView):
+    """
+    Proxy view for retrieving existing reservation details.
+    """
+
+    def validate_my_booking_response(self, data):
+        """
+        Validate the structure of a successful reservation retrieval response.
+        """
+        if not isinstance(data, dict):
+            return Response(
+                {"error": "Upstream response malformed: expected JSON object"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # Legacy API might return 'error' as a key even with HTTP 200
+        if "error" in data:
+            return None
+
+        # Check for essential fields defined in api-integration-my-booking.md
+        # Status and client are usually present in a valid reservation object
+        if "status" not in data and "items" not in data:
+            return Response(
+                {"error": "Upstream response malformed: missing reservation data"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        return None
+
+    def post(self, request, *args, **kwargs):
+        # Validate required input
+        code = request.data.get("code")
+        email = request.data.get("email")
+
+        if not code or not email:
+            return Response(
+                {"error": "Both 'code' and 'email' are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return self.execute_proxy_request(
+            fetch_my_booking,
+            request.data,
+            validate_func=self.validate_my_booking_response,
+        )
