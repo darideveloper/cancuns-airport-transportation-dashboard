@@ -19,7 +19,5 @@ info.txt
 */.DS_Store 
 .DS_Store
 /docs 
-/openspec/changes/*
-!openspec/changes/archive/
 *.temp
 .windsurf/

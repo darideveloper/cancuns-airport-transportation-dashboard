@@ -204,14 +204,54 @@ MEDIA_URL = "/media/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
+STORAGE_AWS = os.getenv("STORAGE_AWS") == "True"
+
+if STORAGE_AWS:
+    # 1. Credentials
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+
+    # 2. Regional Settings
+    AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL")
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")
+
+    # 3. Domain/CDN settings
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")
+
+    # 4. Folder isolation
+    AWS_PROJECT_FOLDER = os.getenv("AWS_PROJECT_FOLDER")
+
+    # 5. File Locations
+    STATIC_LOCATION = f"{AWS_PROJECT_FOLDER}/static"
+    PUBLIC_MEDIA_LOCATION = f"{AWS_PROJECT_FOLDER}/media"
+    PRIVATE_MEDIA_LOCATION = f"{AWS_PROJECT_FOLDER}/private"
+
+    # 6. Django-Storages Engine Mapping
+    STORAGES = {
+        "default": {
+            "BACKEND": "project.storage_backends.PublicMediaStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "project.storage_backends.StaticStorage",
+        },
+        "private": {
+            "BACKEND": "project.storage_backends.PrivateMediaStorage",
+        },
+    }
+
+    # 7. Optimization & Security
+    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+    AWS_DEFAULT_ACL = None
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
 
 
 # Setup drf

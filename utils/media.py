@@ -21,9 +21,15 @@ def get_media_url(object_or_url: object) -> str:
     else:
         url_str = object_or_url.url
 
-    if "s3.amazonaws.com" not in url_str:
-        return f"{settings.HOST}{url_str}"
-    return url_str
+    # Check for absolute URLs
+    if (
+        "s3.amazonaws.com" in url_str
+        or "digitaloceanspaces" in url_str
+        or "storage.railway.app" in url_str
+    ):
+        return url_str
+
+    return f"{settings.HOST}{url_str}"
 
 
 def get_test_image(image_name: str = "test.png") -> SimpleUploadedFile:

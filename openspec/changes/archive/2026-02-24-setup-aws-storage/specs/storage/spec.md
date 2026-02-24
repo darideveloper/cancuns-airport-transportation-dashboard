@@ -1,9 +1,4 @@
-# storage Specification
-
-## Purpose
-The storage capability handles the storage and retrieval of static and media files across different environments. It supports both local filesystem storage for development and cloud-based storage (AWS S3 or DigitalOcean Spaces) for production, using a storage-independent utility for URL resolution.
-
-## Requirements
+## MODIFIED Requirements
 ### Requirement: Default Local Storage
 The system SHALL use the local filesystem for all file storage when `STORAGE_AWS` is `False`.
 
@@ -13,12 +8,7 @@ The system SHALL use the local filesystem for all file storage when `STORAGE_AWS
 - **THEN** the file MUST be saved in the `MEDIA_ROOT` directory on the local disk
 - **AND** the file URL MUST start with `MEDIA_URL` (typically `/media/`)
 
-#### Scenario: Static File Serving
-- **Given** static assets in the `static/` directory.
-- **When** `collectstatic` is run.
-- **Then** files MUST be collected into `STATIC_ROOT`.
-- **And** WhiteNoise MUST serve these files with compression and manifest support.
-
+## ADDED Requirements
 ### Requirement: Cloud Storage Support
 The system SHALL support AWS S3 and DigitalOcean Spaces for file storage when `STORAGE_AWS` is `True`.
 
