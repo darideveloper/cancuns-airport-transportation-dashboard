@@ -17,6 +17,9 @@ WORKDIR /app
 # Copy the current directory contents into the container
 COPY . /app/
 
+# Ensure start script is executable
+RUN chmod +x /app/start.sh
+
 # Required ARGs and ENVs for Build-Time operations
 # These must be passed via Coolify's Build Environment Variables
 ARG SECRET_KEY
