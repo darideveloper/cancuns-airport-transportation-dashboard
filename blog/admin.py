@@ -59,3 +59,7 @@ class ImageAdmin(ModelAdminUnfoldBase):
         if obj.image:
             return format_html(f'<img src="{obj.image.url}" class="img-preview" />')
         return None
+        
+    def has_module_permission(self, request):
+        # The model still exists, but won't show up in the sidebar or index
+        return False
