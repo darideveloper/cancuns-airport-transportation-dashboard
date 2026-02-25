@@ -35,13 +35,13 @@ class ImageAdmin(ModelAdminUnfoldBase):
     # actions
     actions_row = ["copy_link"]
 
-    @action(description="Copiar link")
+    @action(description="Copy link")
     def copy_link(self, request: HttpRequest, object_id: int):
         obj = self.get_object(request, object_id)
 
         # Get url and show message
         image_url = get_media_url(obj.image.url)
-        messages.success(request, f"Copiado al portapapeles: {image_url}")
+        messages.success(request, f"Copied to clipboard: {image_url}")
 
         # Redirect to the same page with a cookie
         response = redirect(request.META.get("HTTP_REFERER", ".."))

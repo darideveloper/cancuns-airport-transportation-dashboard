@@ -71,7 +71,7 @@ class ModelAdminUnfoldBase(ModelAdmin):
         return [self.get_unfold_action(action) for action in all_actions]
 
     @action(
-        description="Editar",
+        description="Edit",
         permissions=["edit"],
         url_path="edit-post",
     )

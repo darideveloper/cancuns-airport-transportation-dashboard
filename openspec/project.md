@@ -21,7 +21,7 @@ Cancun Airport Transportation (CAT) Dashboard is a backend administrative system
     - Fields/Variables: `snake_case`
     - Admin Classes: `[ModelName]Admin`
 - **Formatting**: PEP 8 for Python. Use `clsx` for conditional classes in any frontend components (React/Astro).
-- **Localization**: Projects use `es-mx` as the default language. All `verbose_name` and `help_text` in models should be in Spanish.
+- **Localization**: Projects use English as the default language for metadata. All `verbose_name` and `help_text` in models should be in English.
 
 ### Architecture Patterns
 - **Base Admin**: Centralized logic in `project/admin.py` via `ModelAdminUnfoldBase` to ensure consistent UI (compressed fields, unsaved form warnings, global date filters).
