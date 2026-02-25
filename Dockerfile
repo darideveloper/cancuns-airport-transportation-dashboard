@@ -50,14 +50,11 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -r requirements.txt
 
-# Collect static files and migrate database
+# Collect static files
 RUN python manage.py collectstatic --noinput
-RUN python manage.py makemigrations
-RUN python manage.py migrate
-# RUN python manage.py apps_loaddata
 
 # Expose the port that Django/Gunicorn will run on
 EXPOSE 80
 
-# Command to run Gunicorn with the WSGI application for production
-CMD ["gunicorn", "--bind", "0.0.0.0:80", "project.wsgi:application"]
+# Command to run the start script
+CMD ["./start.sh"]

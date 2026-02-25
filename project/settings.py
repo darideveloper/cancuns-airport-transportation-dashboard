@@ -190,11 +190,17 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # Cors
-if os.getenv("CORS_ALLOWED_ORIGINS") != "None":
-    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+cors_allowed = os.getenv("CORS_ALLOWED_ORIGINS")
+if cors_allowed and cors_allowed != "None":
+    CORS_ALLOWED_ORIGINS = [
+        origin.strip().rstrip("/") for origin in cors_allowed.split(",") if origin.strip()
+    ]
 
-if os.getenv("CSRF_TRUSTED_ORIGINS") != "None":
-    CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+csrf_trusted = os.getenv("CSRF_TRUSTED_ORIGINS")
+if csrf_trusted and csrf_trusted != "None":
+    CSRF_TRUSTED_ORIGINS = [
+        origin.strip().rstrip("/") for origin in csrf_trusted.split(",") if origin.strip()
+    ]
 
 
 # Storage settings
