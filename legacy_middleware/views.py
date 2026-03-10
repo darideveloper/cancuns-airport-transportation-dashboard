@@ -11,6 +11,7 @@ from .services import (
     fetch_quote,
     fetch_reservation_create,
     fetch_payment_link,
+    fetch_payment_capture_order,
     fetch_my_booking,
 )
 
@@ -221,6 +222,10 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
         val = request.data.get("payment_method")
         payment_method = str(val).upper() if val else ""
 
+        # Map CREDIT_CARD to PAYPAL as we are using PayPal Cards now
+        if payment_method == "CREDIT_CARD":
+            payment_method = "PAYPAL"
+
         if payment_method in ["STRIPE", "PAYPAL"]:
             reservation_data = response.data
             reservation_id = self.extract_reservation_id(reservation_data)
@@ -275,10 +280,28 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                         status=status.HTTP_502_BAD_GATEWAY,
                     )
 
-                # 4. Return ONLY the payment link
-                return Response(
-                    {"payment_link": link_data.get("url")}, status=status.HTTP_200_OK
-                )
+                # 4. Return the payment link and additional data for PayPal SDK
+                result = {
+                    "payment_link": link_data.get("url"),
+                    "reservation_id": reservation_id,
+                }
+
+                # Include all data from upstream (e.g. paypal_id)
+                if isinstance(link_data, dict):
+                    result.update(link_data)
+
+                # Include uuid if present in reservation_data
+                if isinstance(reservation_data, dict):
+                    if "uuid" in reservation_data:
+                        result["uuid"] = reservation_data["uuid"]
+                    elif (
+                        "config" in reservation_data
+                        and isinstance(reservation_data["config"], dict)
+                        and "uuid" in reservation_data["config"]
+                    ):
+                        result["uuid"] = reservation_data["config"]["uuid"]
+
+                return Response(result, status=status.HTTP_200_OK)
 
             except Exception:
                 # Catch requests.RequestException or other errors
@@ -288,6 +311,22 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                 )
 
         return response
+
+
+class PaymentCaptureProxyView(BaseLegacyProxyView):
+    """
+    Proxy view for the legacy PayPal Capture API.
+    GET /api/v1/reservation/payment/paypal/capture-order
+    """
+
+    def post(self, request, *args, **kwargs):
+        order_id = request.data.get("id")
+        if not order_id:
+            return Response(
+                {"error": "Order ID is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return self.execute_proxy_request(fetch_payment_capture_order, order_id)
 
 
 class MyBookingProxyView(BaseLegacyProxyView):

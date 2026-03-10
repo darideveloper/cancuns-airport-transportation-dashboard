@@ -161,6 +161,29 @@ def fetch_payment_link(
     )
 
 
+def fetch_payment_capture_order(token, order_id):
+    """
+    Capture a PayPal order in the legacy API.
+    GET /api/v1/reservation/payment/paypal/capture-order
+
+    Args:
+        token (str): The OAuth token.
+        order_id (str): The PayPal order ID.
+
+    Returns:
+        requests.Response: The response from the legacy API.
+    """
+    params = {
+        "id": order_id,
+    }
+    return _legacy_request(
+        "api/v1/reservation/payment/paypal/capture-order",
+        method="GET",
+        params=params,
+        token=token,
+    )
+
+
 def fetch_my_booking(token, payload):
     """
     Fetch reservation details from the legacy API.
