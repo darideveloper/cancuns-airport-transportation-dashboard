@@ -222,6 +222,20 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
         payment_method_str = str(original_payment_method).upper() if original_payment_method else ""
         
         payload = request.data.copy()
+
+        # Field Mapping for Legacy Compatibility
+        mapping = {
+            "flightNumber": "flight_number",
+            "notes": "comments",
+            "firstName": "first_name",
+            "lastName": "last_name",
+            "email": "email_address"
+        }
+
+        for front_key, back_key in mapping.items():
+            if front_key in payload:
+                payload[back_key] = payload.pop(front_key)
+
         if payment_method_str == "CASH":
             payload["pay_at_arrival"] = 1
         else:
@@ -269,29 +283,17 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                 # Reuse token from cache handling in base view
                 token_obj = self.get_legacy_token()
 
-                from urllib.parse import urlparse
-
                 cancel_val = request.data.get("cancel_url")
                 success_val = request.data.get("success_url")
 
-                # Helper to strip domain and ensure leading slash
-                def to_relative(url):
-                    if not url:
-                        return url
-                    parsed = urlparse(str(url))
-                    path = parsed.path if parsed.path else str(url)
-                    if path and not path.startswith("/"):
-                        return f"/{path}"
-                    return path
-
-                # Fetch payment link
+                # Fetch payment link (Pass absolute URLs directly)
                 payment_response = fetch_payment_link(
                     token=token_obj.token,
                     reservation_id=reservation_id,
                     payment_provider=payment_provider,
                     language=request.data.get("language", "en"),
-                    success_url=to_relative(success_val),
-                    cancel_url=to_relative(cancel_val),
+                    success_url=success_val,
+                    cancel_url=cancel_val,
                 )
 
                 # Custom handling for non-200 payment responses
@@ -321,12 +323,22 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                     )
 
                 # 5. Return standardized response
-                return Response({
+                response_payload = {
                     "reservation_id": reservation_id,
                     "uuid": uuid,
                     "payment_method": original_payment_method,
                     "payment_data": link_data
-                }, status=status.HTTP_200_OK)
+                }
+
+                # Hoist paypal_id if present with safety check and provider-specific fallback
+                if isinstance(link_data, dict):
+                    if "paypal_id" in link_data:
+                        response_payload["paypal_id"] = link_data["paypal_id"]
+                    elif payment_provider == "PAYPAL-V2" and "url" in link_data:
+                        # For PAYPAL-V2, 'url' field contains the actual Order ID
+                        response_payload["paypal_id"] = link_data["url"]
+
+                return Response(response_payload, status=status.HTTP_200_OK)
 
             except Exception as e:
                 # Catch requests.RequestException or other errors

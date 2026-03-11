@@ -48,13 +48,28 @@ The system MUST provide an endpoint to capture a PayPal order via the legacy API
 - **THEN** the system SHALL return a 400 Bad Request error.
 
 ### Requirement: Standardized Proxy Response
-The system MUST provide a consistent JSON response structure for all successful reservation creation requests.
+The response from the reservation creation proxy MUST correctly identify the PayPal Order ID and hoist it to the top level.
 
-#### Scenario: Standardized Response Success
-- **WHEN** a reservation is successfully created (any method).
-- **THEN** the response MUST include:
-  - `reservation_id`: (int/str) The legacy ID.
-  - `uuid`: (str) The reservation UUID.
-  - `payment_method`: (str) The original requested method.
-  - `payment_data`: (dict) Provider metadata (empty for CASH).
+#### Scenario: PayPal-V2 Order ID Hoisting
+- **Given** a successful reservation creation with `PAYPAL` or `CREDIT_CARD` method
+- **When** the proxy receives a response from the `PAYPAL-V2` provider containing an ID in the `url` field
+- **Then** the proxy MUST include that ID as `paypal_id` at the top level of the JSON response payload.
+
+#### Scenario: Explicit PayPal ID Hoisting
+- **Given** a successful reservation creation with an online payment method
+- **When** the proxy receives a response containing an explicit `paypal_id` field in `payment_data`
+- **Then** that value MUST be hoisted to the top level of the JSON response payload as `paypal_id`.
+
+### Requirement: Field Mapping for Legacy Compatibility
+The proxy SHALL ensure that data received from the frontend is correctly mapped to the fields expected by the legacy API.
+
+#### Scenario: Request Field Translation
+- **Given** a reservation creation request from the frontend
+- **When** the proxy forwards the payload to the legacy system
+- **Then** it MUST perform the following field mappings:
+  - `flightNumber` -> `flight_number`
+  - `notes` -> `comments`
+  - `firstName` -> `first_name`
+  - `lastName` -> `last_name`
+  - `email` -> `email_address`
 

@@ -653,9 +653,9 @@ class ReservationCreateProxyViewTestCase(APITestCase):
         args, kwargs = mock_payment.call_args
         self.assertEqual(kwargs["reservation_id"], "RES100")
         self.assertEqual(kwargs["payment_provider"], "STRIPE")
-        # Verify relative URLs
-        self.assertEqual(kwargs["success_url"], "/success")
-        self.assertEqual(kwargs["cancel_url"], "/cancel")
+        # Verify absolute URLs (no more stripping)
+        self.assertEqual(kwargs["success_url"], "http://ok.com/success")
+        self.assertEqual(kwargs["cancel_url"], "http://no.com/cancel")
 
     @patch("legacy_middleware.views.fetch_legacy_token")
     @patch("legacy_middleware.views.fetch_reservation_create")
@@ -1091,3 +1091,129 @@ class ReservationCreateProxyLiveTests(APITestCase):
             )
         )
         self.assertTrue(has_id, f"Response missing reservation ID: {data}")
+
+class ReservationCreateProxyViewNewTests(APITestCase):
+    """
+    Tests for new functionality in ReservationCreateProxyView:
+    - Field mapping
+    - Absolute redirect URLs
+    - Hoisted paypal_id
+    """
+
+    def setUp(self):
+        self.url = reverse("legacy_reservation_create")
+        LegacyAPIToken.objects.all().delete()
+        LegacyAPIToken.objects.create(
+            token="valid_token", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    @patch("legacy_middleware.views.fetch_payment_link")
+    def test_field_mapping(self, mock_payment, mock_create):
+        """Verify frontend fields are mapped to legacy fields."""
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"reservation_id": "RES123", "uuid": "uuid123"}
+        mock_create.return_value = mock_create_resp
+
+        payload = {
+            "firstName": "John",
+            "lastName": "Doe",
+            "email": "john@example.com",
+            "flightNumber": "AA123",
+            "notes": "Some notes",
+            "payment_method": "CASH"
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify mapped payload sent to legacy
+        args, _ = mock_create.call_args
+        sent_payload = args[1]
+        self.assertEqual(sent_payload["first_name"], "John")
+        self.assertEqual(sent_payload["last_name"], "Doe")
+        self.assertEqual(sent_payload["email_address"], "john@example.com")
+        self.assertEqual(sent_payload["flight_number"], "AA123")
+        self.assertEqual(sent_payload["comments"], "Some notes")
+        # Ensure old keys are gone
+        self.assertNotIn("firstName", sent_payload)
+        self.assertNotIn("lastName", sent_payload)
+        self.assertNotIn("email", sent_payload)
+        self.assertNotIn("flightNumber", sent_payload)
+        self.assertNotIn("notes", sent_payload)
+
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    @patch("legacy_middleware.views.fetch_payment_link")
+    def test_absolute_redirect_urls(self, mock_payment, mock_create):
+        """Verify redirect URLs are passed as-is (absolute)."""
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"reservation_id": "RES123", "uuid": "uuid123"}
+        mock_create.return_value = mock_create_resp
+
+        mock_payment_resp = MagicMock()
+        mock_payment_resp.status_code = 200
+        mock_payment_resp.json.return_value = {"url": "http://paypal.com/pay"}
+        mock_payment.return_value = mock_payment_resp
+
+        payload = {
+            "payment_method": "PAYPAL",
+            "success_url": "https://example.com/success",
+            "cancel_url": "https://example.com/cancel"
+        }
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify URLs in mock_payment call
+        _, kwargs = mock_payment.call_args
+        self.assertEqual(kwargs["success_url"], "https://example.com/success")
+        self.assertEqual(kwargs["cancel_url"], "https://example.com/cancel")
+
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    @patch("legacy_middleware.views.fetch_payment_link")
+    def test_hoisted_paypal_id(self, mock_payment, mock_create):
+        """Verify paypal_id is hoisted to top level (testing explicit field first)."""
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"reservation_id": "RES123", "uuid": "uuid123"}
+        mock_create.return_value = mock_create_resp
+
+        mock_payment_resp = MagicMock()
+        mock_payment_resp.status_code = 200
+        mock_payment_resp.json.return_value = {
+            "url": "http://paypal.com/pay",
+            "paypal_id": "PP-123"
+        }
+        mock_payment.return_value = mock_payment_resp
+
+        payload = {"payment_method": "PAYPAL"}
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify hoisted ID
+        self.assertEqual(response.data["paypal_id"], "PP-123")
+
+    @patch("legacy_middleware.views.fetch_reservation_create")
+    @patch("legacy_middleware.views.fetch_payment_link")
+    def test_hoisted_paypal_id_from_url_for_paypal_v2(self, mock_payment, mock_create):
+        """Verify paypal_id is hoisted from 'url' field for PAYPAL-V2."""
+        mock_create_resp = MagicMock()
+        mock_create_resp.status_code = 200
+        mock_create_resp.json.return_value = {"reservation_id": "RES123", "uuid": "uuid123"}
+        mock_create.return_value = mock_create_resp
+
+        mock_payment_resp = MagicMock()
+        mock_payment_resp.status_code = 200
+        # In PAYPAL-V2, the 'url' field contains the actual Order ID
+        mock_payment_resp.json.return_value = {
+            "url": "276558366V741682B"
+        }
+        mock_payment.return_value = mock_payment_resp
+
+        payload = {"payment_method": "PAYPAL"} # Maps to PAYPAL-V2 internally
+        response = self.client.post(self.url, payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify hoisted ID from 'url' field
+        self.assertEqual(response.data["paypal_id"], "276558366V741682B")
+        self.assertEqual(response.data["payment_data"]["url"], "276558366V741682B")
