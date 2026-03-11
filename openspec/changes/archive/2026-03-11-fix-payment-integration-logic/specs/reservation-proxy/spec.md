@@ -1,8 +1,7 @@
-# reservation-proxy Specification
+# reservation-proxy Specification Update
 
-## Purpose
-The system MUST provide a proxy endpoint to create bookings in the legacy system, handling authentication and common parameters automatically.
-## Requirements
+## MODIFIED Requirements
+
 ### Requirement: Create Reservation Proxy
 The system SHALL provide a public endpoint that proxies reservation creation requests to the legacy API. It MUST automatically handle JWT authentication and inject the default `site_id`.
 
@@ -14,13 +13,6 @@ The system SHALL provide a public endpoint that proxies reservation creation req
 #### Scenario: Successful Online Reservation (Stripe/PayPal)
 - **WHEN** a POST request is sent to `/legacy/create/` with an online `payment_method`.
 - **THEN** the system SHALL omit `"pay_at_arrival"` from the legacy API payload.
-
-### Requirement: Response Validation
-The system MUST validate the structural integrity of successful upstream responses (200 OK) to prevent passing malformed data to the client.
-
-#### Scenario: Malformed Success Response
-- **WHEN** the upstream API returns 200 OK but with missing critical fields (e.g., `reservation_id` or `id`).
-- **THEN** the system SHALL return a 502 Bad Gateway error indicating a malformed response.
 
 ### Requirement: Send Payment Link for Online Payments
 The system SHALL generate a payment link for non-cash reservations (Stripe/PayPal/Credit Card) and return it along with all payment provider metadata (e.g. `paypal_id`) and reservation metadata (e.g. `uuid`).
@@ -35,17 +27,7 @@ The system SHALL generate a payment link for non-cash reservations (Stripe/PayPa
 - **THEN** the system SHALL map it to "PAYPAL-V2" internally for the upstream call.
 - **AND** return `"payment_method": "CREDIT_CARD"` in the response.
 
-### Requirement: PayPal Order Capture Proxy
-The system MUST provide an endpoint to capture a PayPal order via the legacy API.
-
-#### Scenario: Successful PayPal Capture
-- **WHEN** a POST request is sent to `/legacy/capture/` with a valid PayPal Order `id`.
-- **THEN** the system SHALL call the legacy capture API (`GET /api/v1/reservation/payment/paypal/capture-order`).
-- **AND** return the upstream capture response to the client.
-
-#### Scenario: Capture Missing Order ID
-- **WHEN** a POST request is sent to `/legacy/capture/` without an `id`.
-- **THEN** the system SHALL return a 400 Bad Request error.
+## ADDED Requirements
 
 ### Requirement: Standardized Proxy Response
 The system MUST provide a consistent JSON response structure for all successful reservation creation requests.
@@ -57,4 +39,3 @@ The system MUST provide a consistent JSON response structure for all successful 
   - `uuid`: (str) The reservation UUID.
   - `payment_method`: (str) The original requested method.
   - `payment_data`: (dict) Provider metadata (empty for CASH).
-

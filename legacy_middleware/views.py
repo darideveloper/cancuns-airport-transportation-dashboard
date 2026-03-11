@@ -206,30 +206,55 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                     return data["config"]["code"]
         return None
 
+    def extract_uuid(self, data):
+        """Helper to safely extract the UUID from various response formats."""
+        if isinstance(data, dict):
+            if "uuid" in data:
+                return data["uuid"]
+            if "config" in data and isinstance(data["config"], dict):
+                if "uuid" in data["config"]:
+                    return data["config"]["uuid"]
+        return None
+
     def post(self, request, *args, **kwargs):
-        # 1. Create Reservation
+        # 1. Prepare Payload & Handle CASH
+        original_payment_method = request.data.get("payment_method")
+        payment_method_str = str(original_payment_method).upper() if original_payment_method else ""
+        
+        payload = request.data.copy()
+        if payment_method_str == "CASH":
+            payload["pay_at_arrival"] = 1
+        else:
+            # Ensure it's not present if not CASH
+            payload.pop("pay_at_arrival", None)
+
+        # 2. Create Reservation
         response = self.execute_proxy_request(
             fetch_reservation_create,
-            request.data,
+            payload,
             validate_func=self.validate_reservation_response,
         )
 
         if response.status_code != 200:
             return response
 
-        # 2. Check for Payment Generation Requirement (Stripe/PayPal)
-        # Convert to string to avoid AttributeError if None
-        val = request.data.get("payment_method")
-        payment_method = str(val).upper() if val else ""
+        reservation_data = response.data
+        if isinstance(reservation_data, dict) and "error" in reservation_data:
+            return response
 
+        reservation_id = self.extract_reservation_id(reservation_data)
+        uuid = self.extract_uuid(reservation_data)
+
+        # 3. Check for Payment Generation Requirement (Stripe/PayPal)
         # Map CREDIT_CARD to PAYPAL as we are using PayPal Cards now
-        if payment_method == "CREDIT_CARD":
-            payment_method = "PAYPAL"
+        # Map to PAYPAL-V2 for modern SDK support
+        payment_provider = payment_method_str
+        if payment_provider == "CREDIT_CARD":
+            payment_provider = "PAYPAL-V2"
+        elif payment_provider == "PAYPAL":
+            payment_provider = "PAYPAL-V2"
 
-        if payment_method in ["STRIPE", "PAYPAL"]:
-            reservation_data = response.data
-            reservation_id = self.extract_reservation_id(reservation_data)
-
+        if payment_provider in ["STRIPE", "PAYPAL-V2"]:
             # Fallback if extract helper failed but validation passed (should be rare)
             if not reservation_id:
                 return Response(
@@ -239,37 +264,52 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                     status=status.HTTP_502_BAD_GATEWAY,
                 )
 
-            # 3. Get Payment Link
+            # 4. Get Payment Link
             try:
                 # Reuse token from cache handling in base view
                 token_obj = self.get_legacy_token()
 
-                # WORKAROUND: Force relative paths to avoid "http://..." doubling
-                # This means localhost users will be redirected to cancunsairporttransportation.com
                 from urllib.parse import urlparse
 
                 cancel_val = request.data.get("cancel_url")
                 success_val = request.data.get("success_url")
 
-                # Helper to strip domain
+                # Helper to strip domain and ensure leading slash
                 def to_relative(url):
                     if not url:
                         return url
                     parsed = urlparse(str(url))
-                    return parsed.path if parsed.path else str(url)
+                    path = parsed.path if parsed.path else str(url)
+                    if path and not path.startswith("/"):
+                        return f"/{path}"
+                    return path
 
                 # Fetch payment link
                 payment_response = fetch_payment_link(
                     token=token_obj.token,
                     reservation_id=reservation_id,
-                    payment_provider=payment_method,
+                    payment_provider=payment_provider,
                     language=request.data.get("language", "en"),
                     success_url=to_relative(success_val),
                     cancel_url=to_relative(cancel_val),
                 )
 
-                # Raise error if non-200
-                payment_response.raise_for_status()
+                # Custom handling for non-200 payment responses
+                if payment_response.status_code != 200:
+                    try:
+                        error_detail = payment_response.json()
+                    except ValueError:
+                        error_detail = "Unknown upstream error"
+                    
+                    return Response(
+                        {
+                            "error": "Failed to initialize payment with upstream provider",
+                            "upstream_error": error_detail,
+                            "reservation_id": reservation_id,
+                            "uuid": uuid
+                        },
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
 
                 # Parse JSON
                 try:
@@ -280,37 +320,33 @@ class ReservationCreateProxyView(BaseLegacyProxyView):
                         status=status.HTTP_502_BAD_GATEWAY,
                     )
 
-                # 4. Return the payment link and additional data for PayPal SDK
-                result = {
-                    "payment_link": link_data.get("url"),
+                # 5. Return standardized response
+                return Response({
                     "reservation_id": reservation_id,
-                }
+                    "uuid": uuid,
+                    "payment_method": original_payment_method,
+                    "payment_data": link_data
+                }, status=status.HTTP_200_OK)
 
-                # Include all data from upstream (e.g. paypal_id)
-                if isinstance(link_data, dict):
-                    result.update(link_data)
-
-                # Include uuid if present in reservation_data
-                if isinstance(reservation_data, dict):
-                    if "uuid" in reservation_data:
-                        result["uuid"] = reservation_data["uuid"]
-                    elif (
-                        "config" in reservation_data
-                        and isinstance(reservation_data["config"], dict)
-                        and "uuid" in reservation_data["config"]
-                    ):
-                        result["uuid"] = reservation_data["config"]["uuid"]
-
-                return Response(result, status=status.HTTP_200_OK)
-
-            except Exception:
+            except Exception as e:
                 # Catch requests.RequestException or other errors
                 return Response(
-                    {"error": "Failed to generate payment link"},
+                    {
+                        "error": "Failed to generate payment link",
+                        "detail": str(e),
+                        "reservation_id": reservation_id,
+                        "uuid": uuid
+                    },
                     status=status.HTTP_502_BAD_GATEWAY,
                 )
 
-        return response
+        # Standardized response for CASH or other non-online methods
+        return Response({
+            "reservation_id": reservation_id,
+            "uuid": uuid,
+            "payment_method": original_payment_method,
+            "payment_data": {}
+        }, status=status.HTTP_200_OK)
 
 
 class PaymentCaptureProxyView(BaseLegacyProxyView):
